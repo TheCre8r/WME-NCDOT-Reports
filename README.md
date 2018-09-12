@@ -6,7 +6,7 @@ This script quickly locates active closures published by NCDOT on North Carolina
 
 NCDOT closures feed can be refreshed, pulling in the latest closures, using the “Refresh” icon. Additionally, there is a convenient “Archive” feature to archive any closures that have been reviewed.	
 
-![Screenshot](http://image.prntscr.com/image/ad6e5f7a36c04fcd82f799a76180b4ca.png)
+![Screenshot](https://upload.wikimedia.org/wikipedia/commons/thumb/a/ac/No_image_available.svg/240px-No_image_available.svg.png)
 
 ## Version History
 
@@ -15,7 +15,7 @@ v 0.5.2 - Public rerelease
 ## Installation
 
 Install just like any other userscript by clicking this link:
-https://github.com/WazeNC/WME-NCDOT-Reports /raw/master/WME-NCDOT-Reports.user.js
+https://github.com/TheCre8r/WME-NCDOT-Reports/raw/master/WME-NCDOT-Reports.user.js
 
 ## Contributors
 
