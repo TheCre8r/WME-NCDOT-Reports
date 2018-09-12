@@ -174,7 +174,6 @@
         }
     }
     function getCamera(cameraId) {
-        debugger;
         for (var i=0; i<_cameras.length; i++) {
             if (_cameras[i].properties.id === cameraId) { return _cameras[i]; }
         }
@@ -635,6 +634,20 @@
         _mapLayer.events.register('visibilitychanged',null,onLayerVisibilityChanged);
     }
 
+    function onTimsIdGoClick() {
+        let $entry = $('#tims-id-entry');
+        let id = $entry.val().trim();
+        if (id.length > 0) {
+            let report = _reports.find(rpt => rpt.id.toString() === id)
+            if (report) {
+                report.dataRow.click();
+            } else {
+                $entry.css({'background-color':'#faa'});
+                setTimeout(() => $entry.css({'background-color':'#fff'}), 1000);
+            };
+        }
+    }
+
     function restoreUserTab() {
         $('#user-tabs > .nav-tabs').append(_tabDiv.tab);
         $('#user-info > .flex-parent > .tab-content').append(_tabDiv.panel);
@@ -649,6 +662,12 @@
             refreshPopup.show();
             setTimeout(function() { refreshPopup.hide(); }, 1500);
             e.stopPropagation();
+        });
+        $('#tims-id-go').click(onTimsIdGoClick);
+        $('#tims-id-entry').on('keyup', e => {
+            if (e.keyCode == 13) {
+                onTimsIdGoClick();
+            };
         });
     }
 
@@ -665,7 +684,12 @@
         );
 
         _tabDiv.panel = $('<div>', {class:'tab-pane', id:'sidepanel-nc-statedot'}).append(
-            $('<div>',  {class:'side-panel-section>'}).append(
+            $('<div>', {class:'side-panel-section>'}).append(
+                $('<div>').append(
+                    $('<span>', {style:'margin-right:4px;'}).text('TIMS ID:'),
+                    $('<input>', {id:'tims-id-entry', type:'text', style:'margin-right:4px; height:23px; width:80px;'}),
+                    $('<button>', {id:'tims-id-go', style:'height:23px;'}).text('Go')
+                ),
                 $('<label style="width:100%; cursor:pointer; border-bottom: 1px solid #e0e0e0; margin-top:9px;" data-toggle="collapse" data-target="#ncDotSettingsCollapse"><span class="fa fa-caret-down" style="margin-right:5px;font-size:120%;"></span>Hide reports...</label>')).append(
                 $('<div>',{id:'ncDotSettingsCollapse',class:'collapse'}).append(
                     $('<div>',{class:'controls-container'})
