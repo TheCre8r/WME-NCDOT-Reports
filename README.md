@@ -11,6 +11,7 @@ NCDOT closures feed can be refreshed, pulling in the latest closures, using the 
 ## Version History
 
 v 0.5.2 - Public rerelease
+
 v 0.5.3 - Add TIMS ID entry box
 
 ## Installation
@@ -20,7 +21,7 @@ https://github.com/TheCre8r/WME-NCDOT-Reports/raw/master/WME-NCDOT-Reports.user.
 
 ## Contributors
 
-* **Mapomatic** - *Initial work*
+* **Mapomatic** - *Initial work and feature requests*
 * **The_Cre8r** - *Compatibility updates*
 
 ## License
