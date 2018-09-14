@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME North Carolina DOT Reports
 // @namespace    https://greasyfork.org/users/45389
-// @version      0.5.3
+// @version      0.5.4
 // @description  Display NC transportation department reports in WME.
 // @author       MapOMatic and The_Cre8r
 // @license      GNU GPLv3
@@ -241,7 +241,11 @@
             $('.btn-archive-dot-report').click(function() {setArchiveReport(report,!report.archived, true); buildTable();});
             $('.btn-open-dot-report').click(function(evt) {evt.stopPropagation(); window.open($(this).data('dotReportUrl'),'_blank');});
             $('.reportPopover,.close-popover').click(function(evt) {evt.stopPropagation(); hideAllReportPopovers();});
-            $('.btn-copy-dot-report').click(function(evt) {evt.stopPropagation(); copyToClipboard(getReport($(this).data('dotReportid')).attributes.Reason);});
+            $('.btn-copy-dot-report').click(function(evt) {
+                evt.stopPropagation();
+                let id = $(this).data('dotReportid');
+                copyToClipboard(getReport(id).attributes.IncidentType + ' - NCDOT ' + id);
+            });
             //$(".close-popover").click(function() {hideAllReportPopovers();});
             $div.data('report').dataRow.css('background-color','beige');
         } else {
@@ -426,7 +430,7 @@
         content.push('<br><span style="font-weight:bold">Start Time:</span>&nbsp;&nbsp;' + formatDateTimeString(attr.Start) + '<br>');
         content.push('<span style="font-weight:bold">End Time:</span>&nbsp;&nbsp;' + formatDateTimeString(attr.End) + '<br>');
         content.push('<br><span style="font-weight:bold">Last Updated:</span>&nbsp;&nbsp;' + formatDateTimeString(attr.LastUpdate));
-        content.push('<div"><hr style="margin-bottom:5px;margin-top:5px;border-color:gainsboro"><div style="display:table;width:100%"><button type="button" class="btn btn-primary btn-open-dot-report" data-dot-report-url="' + detailsUrl + report.id + '" style="float:left;">Open in DOT website</button><button type="button" title="Copy REASON to clipboad" class="btn btn-primary btn-copy-dot-report" data-dot-reportid="' + report.id + '" style="float:left;margin-left:6px;"><span class="fa fa-copy"></button><button type="button" style="float:right;" class="btn btn-primary btn-archive-dot-report" data-dot-report-id="' + report.id + '">Archive</button></div></div></div>');
+        content.push('<div"><hr style="margin-bottom:5px;margin-top:5px;border-color:gainsboro"><div style="display:table;width:100%"><button type="button" class="btn btn-primary btn-open-dot-report" data-dot-report-url="' + detailsUrl + report.id + '" style="float:left;">Open in DOT website</button><button type="button" title="Copy short description to clipboard" class="btn btn-primary btn-copy-dot-report" data-dot-reportid="' + report.id + '" style="float:left;margin-left:6px;"><span class="fa fa-copy"></button><button type="button" style="float:right;" class="btn btn-primary btn-archive-dot-report" data-dot-report-id="' + report.id + '">Archive</button></div></div></div>');
 
         var $imageDiv = $(marker.icon.imageDiv)
         .css('cursor', 'pointer')
