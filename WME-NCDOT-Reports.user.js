@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME North Carolina DOT Reports
 // @namespace    https://greasyfork.org/users/45389
-// @version      0.5.2
+// @version      0.5.3
 // @description  Display NC transportation department reports in WME.
 // @author       MapOMatic and The_Cre8r
 // @license      GNU GPLv3
