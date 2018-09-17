@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME North Carolina DOT Reports
 // @namespace    https://greasyfork.org/users/45389
-// @version      0.5.4
+// @version      2018.09.17.001
 // @description  Display NC transportation department reports in WME.
 // @author       MapOMatic and The_Cre8r
 // @license      GNU GPLv3
@@ -24,12 +24,14 @@
 (function() {
     'use strict';
 
-    var _window = unsafeWindow ? unsafeWindow : window;
-    var _settingsStoreName = 'nc_dot_report_settings';
-    var _alertUpdate = false;
-    var _debugLevel = 0;
-    var _scriptVersion = GM_info.script.version;
-    var _scriptVersionChanges = [
+    const REPORTS_URL = 'https://tims.ncdot.gov/tims/api/incidents';
+    const CAMERAS_URL = 'https://tims.ncdot.gov/tims/API/CameraGeoJSON.aspx?TLatitude=36.552&TLongitude=-84.316&BLatitude=33.800&BLongitude=-75.000';
+
+    let _window = unsafeWindow ? unsafeWindow : window;
+    let _settingsStoreName = 'nc_dot_report_settings';
+    let _alertUpdate = false;
+    let _scriptVersion = GM_info.script.version;
+    let _scriptVersionChanges = [
         GM_info.script.name,
         'v' + _scriptVersion,
         'What\'s New',
@@ -37,27 +39,28 @@
         'It\'s working again!'
     ].join('\n');
 
-    var _imagesPath = 'https://github.com/mapomatic/wme-north-carolina-dot-reports/raw/master/images/';
-    var _settings = {};
-    var _tabDiv = {};  // stores the user tab div so it can be restored after switching back from Events mode to Default mode
-    var _reports = [];
-    var _cameras = [];
-    var _lastShownTooltipDiv;
-    var _tableSortKeys = [];
-    var _columnSortOrder = ['attributes.Road', 'attributes.Condition', 'attributes.Start', 'attributes.End'];
-    var _reportTitles = {incident: 'INCIDENT'};
-    var _mapLayer;
-    var _user;
+    let _imagesPath = 'https://github.com/mapomatic/wme-north-carolina-dot-reports/raw/master/images/';
+    let _settings = {};
+    let _tabDiv = {}; // stores the user tab div so it can be restored after switching back from Events mode to Default mode
+    let _reports = [];
+    let _cameras = [];
+    let _lastShownTooltipDiv;
+    let _tableSortKeys = [];
+    let _columnSortOrder = ['attributes.Road', 'attributes.Condition', 'attributes.Start', 'attributes.End'];
+    let _reportTitles = {incident: 'INCIDENT'};
+    let _mapLayer;
+    let _user;
 
-    function log(message, level) {
-        if (message && level <= _debugLevel) {
-            console.log('NC DOT Reports: ' + message);
-        }
+    function log(message) {
+        console.log('NC DOT Reports:', message);
+    }
+    function logDebug(message) {
+        console.debug('NC DOT Reports:', message);
     }
 
     function saveSettingsToStorage() {
         if (localStorage) {
-            var settings = {
+            let settings = {
                 lastVersion: _scriptVersion,
                 layerVisible: _mapLayer.visibility,
                 state: _settings.state,
@@ -67,28 +70,28 @@
                 archivedReports:_settings.archivedReports
             };
             localStorage.setItem(_settingsStoreName, JSON.stringify(settings));
-            log('Settings saved', 1);
+            logDebug('Settings saved');
         }
     }
 
     function formatDateTimeString(dateTimeString) {
-        var dt = new Date(dateTimeString);
+        let dt = new Date(dateTimeString);
         return dt.toLocaleDateString() + ' ' + dt.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
     }
 
     function dynamicSort(property) {
-        var sortOrder = 1;
+        let sortOrder = 1;
         if(property[0] === "-") {
             sortOrder = -1;
             property = property.substr(1);
         }
         return function (a,b) {
-            var props = property.split('.');
+            let props = property.split('.');
             props.forEach(function(prop) {
                 a = a[prop];
                 b = b[prop];
             });
-            var result = (a < b) ? -1 : (a > b) ? 1 : 0;
+            let result = (a < b) ? -1 : (a > b) ? 1 : 0;
             return result * sortOrder;
         };
     }
@@ -99,12 +102,12 @@
      * note that arguments object is an array-like object
      * consisting of the names of the properties to sort by
      */
-        var props = arguments;
+        let props = arguments;
         if (arguments[0] && Array.isArray(arguments[0])) {
             props = arguments[0];
         }
         return function (obj1, obj2) {
-            var i = 0, result = 0, numberOfProperties = props.length;
+            let i = 0, result = 0, numberOfProperties = props.length;
             /* try getting a different result from 0 (equal)
          * as long as we have extra properties to compare
          */
@@ -118,10 +121,10 @@
 
     function copyToClipboard(text) {
         // create hidden text element, if it doesn't already exist
-        var targetId = "_hiddenCopyText_";
-        //var isInput = elem.tagName === "INPUT" || elem.tagName === "TEXTAREA";
-        var origSelectionStart, origSelectionEnd;
-        var target;
+        let targetId = "_hiddenCopyText_";
+        //let isInput = elem.tagName === "INPUT" || elem.tagName === "TEXTAREA";
+        let origSelectionStart, origSelectionEnd;
+        let target;
 
         // must use a temporary form element for the selection and copy
         target = document.getElementById(targetId);
@@ -133,19 +136,19 @@
             target.id = targetId;
             document.body.appendChild(target);
         }
-        //var startTime = new Date(report.beginTime.time);
-        //var lastUpdateTime = new Date(report.updateTime.time);
+        //let startTime = new Date(report.beginTime.time);
+        //let lastUpdateTime = new Date(report.updateTime.time);
 
-        var $content = $('<div>').html(text);
+        let $content = $('<div>').html(text);
         $(target).val($content[0].innerText || $content[0].textContent);
 
         // select the content
-        var currentFocus = document.activeElement;
+        let currentFocus = document.activeElement;
         target.focus();
         target.setSelectionRange(0, target.value.length);
 
         // copy the selection
-        var succeed;
+        let succeed;
         try {
             succeed = document.execCommand("copy");
         } catch(e) {
@@ -161,7 +164,7 @@
     }
 
     function copyIncidentIDsToClipboard() {
-        var ids = [];
+        let ids = [];
         _reports.forEach(function(report) {
             ids.push(report.attributes.IncidentID);
         });
@@ -169,12 +172,12 @@
     }
 
     function getReport(reportId) {
-        for (var i=0; i<_reports.length; i++) {
+        for (let i=0; i<_reports.length; i++) {
             if (_reports[i].id === reportId) { return _reports[i]; }
         }
     }
     function getCamera(cameraId) {
-        for (var i=0; i<_cameras.length; i++) {
+        for (let i=0; i<_cameras.length; i++) {
             if (_cameras[i].properties.id === cameraId) { return _cameras[i]; }
         }
     }
@@ -185,11 +188,11 @@
 
     function updateReportsVisibility() {
         hideAllReportPopovers();
-        var hideArchived = isHideOptionChecked('Archived');
-        var hideAllButWeather = isHideOptionChecked('AllButWeather');
-        var visibleCount = 0;
+        let hideArchived = isHideOptionChecked('Archived');
+        let hideAllButWeather = isHideOptionChecked('AllButWeather');
+        let visibleCount = 0;
         _reports.forEach(function(report) {
-            var hide =
+            let hide =
                 hideArchived && report.archived ||
                 hideAllButWeather && report.attributes.Expr2 !== 'Weather Event';
             if (hide) {
@@ -206,14 +209,14 @@
 
     function hideAllPopovers($excludeDiv) {
         _reports.forEach(function(rpt) {
-            var $div = rpt.imageDiv;
+            let $div = rpt.imageDiv;
             if ((!$excludeDiv || $div[0] !== $excludeDiv[0]) && $div.data('state') === 'pinned') {
                 $div.data('state', '');
                 $div.popover('hide');
             }
         });
         _cameras.forEach(function(rpt) {
-            var $div = rpt.imageDiv;
+            let $div = rpt.imageDiv;
             if ((!$excludeDiv || $div[0] !== $excludeDiv[0]) && $div.data('state') === 'pinned') {
                 $div.data('state', '');
                 $div.popover('hide');
@@ -230,8 +233,8 @@
     function toggleMarkerPopover($div) {
         hideAllPopovers($div);
         if ($div.data('state') !== 'pinned') {
-            var id = $div.data('reportId');
-            var report = getReport(id);
+            let id = $div.data('reportId');
+            let report = getReport(id);
             $div.data('state', 'pinned');
             W.map.moveTo(report.marker.lonlat);
             $div.popover('show');
@@ -290,14 +293,14 @@
     }
 
     function addRow($table, report) {
-        var $img = $('<img>', {src:report.imgUrl, class:'table-img'});
-        var $row = $('<tr> class="clickable"', {id:'nc-dot-row-'+report.id}).append(
+        let $img = $('<img>', {src:report.imgUrl, class:'table-img'});
+        let $row = $('<tr> class="clickable"', {id:'nc-dot-row-'+report.id}).append(
             $('<td>',{class:'centered'}).append(
                 $('<input>',{type:'checkbox',title:'Archive',id:'nc-archive-' + report.id, 'data-report-id':report.id}).prop('checked', report.archived).click(
                     function(evt){
                         evt.stopPropagation();
-                        var id = $(this).data('reportId');
-                        var report = getReport(id);
+                        let id = $(this).data('reportId');
+                        let report = getReport(id);
                         setArchiveReport(report, $(this).is(':checked'), true);
                     }
                 )
@@ -309,10 +312,10 @@
             $('<td>').text(formatDateTimeString(report.attributes.End))
         )
         .click(function () {
-            var $row = $(this);
-            var id = $row.data('reportId');
-            var marker = getReport(id).marker;
-            var $imageDiv = report.imageDiv;
+            let $row = $(this);
+            let id = $row.data('reportId');
+            let marker = getReport(id).marker;
+            let $imageDiv = report.imageDiv;
             //if (!marker.onScreen()) {
             W.map.moveTo(marker.lonlat);
             //}
@@ -326,7 +329,7 @@
 
 
     function onClickColumnHeader(obj) {
-        var prop;
+        let prop;
         switch (/nc-dot-table-(.*)-header/.exec(obj.id)[1]) {
             case 'roadname':
                 prop = 'attributes.Road';
@@ -346,7 +349,7 @@
             default:
                 return;
         }
-        var idx = _columnSortOrder.indexOf(prop);
+        let idx = _columnSortOrder.indexOf(prop);
         if (idx > -1) {
             _columnSortOrder.splice(idx, 1);
             _columnSortOrder.reverse();
@@ -357,9 +360,9 @@
     }
 
     function buildTable() {
-        log('Building table', 1);
-        var $table = $('<table>',{class:'nc-dot-table'});
-        var $th = $('<thead>').appendTo($table);
+        logDebug('Building table');
+        let $table = $('<table>',{class:'nc-dot-table'});
+        let $th = $('<thead>').appendTo($table);
         $th.append(
             $('<tr>').append(
                 $('<th>', {id:'nc-dot-table-archive-header',class:'centered'}).append(
@@ -390,16 +393,16 @@
     }
 
     function addReportToMap(report){
-        var coord = report.geometry;
-        var size = new OpenLayers.Size(24,24);
-        var offset = new OpenLayers.Pixel(-(size.w/2), -size.h);
-        var now = new Date(Date.now());
-        var imgName = 'caution.gif';
-        var attr = report.attributes;
+        let coord = report.geometry;
+        let size = new OpenLayers.Size(24,24);
+        let offset = new OpenLayers.Pixel(-(size.w/2), -size.h);
+        let now = new Date(Date.now());
+        let imgName = 'caution.gif';
+        let attr = report.attributes;
 
         report.imgUrl = _imagesPath + imgName;
-        var icon = new OpenLayers.Icon(report.imgUrl,size,null);
-        var marker = new OpenLayers.Marker(
+        let icon = new OpenLayers.Icon(report.imgUrl,size,null);
+        let marker = new OpenLayers.Marker(
             new OpenLayers.LonLat(report.attributes.Longitude,report.attributes.Latitude).transform(
                 new OpenLayers.Projection("EPSG:4326"),
                 W.map.getProjectionObject()
@@ -407,7 +410,7 @@
             icon
         );
 
-        var popoverTemplate = ['<div class="reportPopover popover" style="max-width:500px;width:500px;">',
+        let popoverTemplate = ['<div class="reportPopover popover" style="max-width:500px;width:500px;">',
                                '<div class="arrow"></div>',
                                '<div class="popover-title"></div>',
                                '<div class="popover-content">',
@@ -417,9 +420,9 @@
         //marker.events.register('click', marker, onMarkerClick);
         _mapLayer.addMarker(marker);
 
-        var detailsUrl = 'http://tims.ncdot.gov/TIMS/IncidentDetail.aspx?id=';
-        var eventLookup = {1:"None", 138:"Hurricane Matthew"};
-        var content = [];
+        let detailsUrl = 'http://tims.ncdot.gov/TIMS/IncidentDetail.aspx?id=';
+        let eventLookup = {1:"None", 138:"Hurricane Matthew"};
+        let content = [];
         content.push('<span style="font-weight:bold">Road:</span>&nbsp;&nbsp;' + removeNull(attr.RoadFullName) + '<br>');
         content.push('<span style="font-weight:bold">City:</span>&nbsp;&nbsp;' + removeNull(attr.City) + '  (' + removeNull(attr.CountyName) + ' County)<br>');
         content.push('<span style="font-weight:bold">Location:</span>&nbsp;&nbsp;' + removeNull(attr.Location) + '<br>');
@@ -432,7 +435,7 @@
         content.push('<br><span style="font-weight:bold">Last Updated:</span>&nbsp;&nbsp;' + formatDateTimeString(attr.LastUpdate));
         content.push('<div"><hr style="margin-bottom:5px;margin-top:5px;border-color:gainsboro"><div style="display:table;width:100%"><button type="button" class="btn btn-primary btn-open-dot-report" data-dot-report-url="' + detailsUrl + report.id + '" style="float:left;">Open in DOT website</button><button type="button" title="Copy short description to clipboard" class="btn btn-primary btn-copy-dot-report" data-dot-reportid="' + report.id + '" style="float:left;margin-left:6px;"><span class="fa fa-copy"></button><button type="button" style="float:right;" class="btn btn-primary btn-archive-dot-report" data-dot-report-id="' + report.id + '">Archive</button></div></div></div>');
 
-        var $imageDiv = $(marker.icon.imageDiv)
+        let $imageDiv = $(marker.icon.imageDiv)
         .css('cursor', 'pointer')
         .addClass('ncDotReport')
         .attr({
@@ -453,14 +456,14 @@
         report.marker = marker;
     }
 
-    function processReports(reports) {
-        var reportIDs = {};
+    function processReports(reports, showPopupWhenDone) {
+        let reportIDs = {};
         _reports = [];
         _cameras = [];
         _mapLayer.clearMarkers();
         fetchCameras();
-        log('Adding reports to map...', 1);
-        var conditionFilter = [
+        logDebug('Processing ' + reports.length + ' reports...');
+        let conditionFilter = [
             'Permanent Road Closure',
             'Ramp Closed',
             'Rest Area Closed',
@@ -471,7 +474,7 @@
         reports.forEach(function(reportDetails) {
             if (!reportIDs.hasOwnProperty(reportDetails.Id)) {
                 reportIDs[reportDetails.Id] = reportDetails.Id;
-                var report = {};
+                let report = {};
                 report.id = reportDetails.Id;
                 report.attributes = reportDetails;
                 if (conditionFilter.indexOf(report.attributes.Condition) > -1) {
@@ -490,35 +493,43 @@
             }
         });
         buildTable();
+        $('.nc-dot-refresh-reports').css({'display': 'inline-block'});
+        if (showPopupWhenDone) {
+            let refreshPopup = $('#nc-dot-refresh-popup');
+            refreshPopup.show();
+            setTimeout(() => refreshPopup.hide(), 1500);
+        }
+        logDebug('Added ' + _reports.length + ' reports to map.');
     }
 
-    function fetchReports() {
-        var url = 'https://tims.ncdot.gov/tims/api/incidents';
+    function fetchReports(showPopupWhenDone) {
+        logDebug('Fetching reports...');
+        $('.nc-dot-report-count').text('Loading reports...');
+        $('.nc-dot-refresh-reports').css({'display': 'none'});
         GM_xmlhttpRequest({
             method: 'GET',
-            url: url,
-            onload: function(res) { processReports($.parseJSON(res.responseText)); }
+            url: REPORTS_URL,
+            onload: function(res) { processReports($.parseJSON(res.responseText), showPopupWhenDone); }
         });
     }
 
     function fetchCameras() {
-        var url = 'https://tims.ncdot.gov/tims/API/CameraGeoJSON.aspx?TLatitude=36.552&TLongitude=-84.316&BLatitude=33.800&BLongitude=-75.000';
         GM_xmlhttpRequest({
             method: 'GET',
-            url: url,
+            url: CAMERAS_URL,
             onload: function(res) {
-                var features = $.parseJSON(res.responseText).features;
+                let features = $.parseJSON(res.responseText).features;
                 features.forEach(function(report) {
-                    var coord = report.geometry.coordinates;
-                    var size = new OpenLayers.Size(24,24);
-                    var offset = new OpenLayers.Pixel(-(size.w/2), -size.h);
-                    var now = new Date(Date.now());
-                    var imgName = 'camera.png';
-                    var attr = report.attributes;
+                    let coord = report.geometry.coordinates;
+                    let size = new OpenLayers.Size(24,24);
+                    let offset = new OpenLayers.Pixel(-(size.w/2), -size.h);
+                    let now = new Date(Date.now());
+                    let imgName = 'camera.png';
+                    let attr = report.attributes;
 
                     report.imgUrl = _imagesPath + imgName;
-                    var icon = new OpenLayers.Icon(report.imgUrl,size,null);
-                    var marker = new OpenLayers.Marker(
+                    let icon = new OpenLayers.Icon(report.imgUrl,size,null);
+                    let marker = new OpenLayers.Marker(
                         new OpenLayers.LonLat(coord[0],coord[1]).transform(
                             new OpenLayers.Projection("EPSG:4326"),
                             W.map.getProjectionObject()
@@ -526,7 +537,7 @@
                         icon
                     );
 
-                    var popoverTemplate = ['<div class="reportPopover popover" style="max-width:450px;width:385px;">',
+                    let popoverTemplate = ['<div class="reportPopover popover" style="max-width:450px;width:385px;">',
                                            '<div class="arrow"></div>',
                                            '<div class="popover-title"></div>',
                                            '<div class="popover-content">',
@@ -535,9 +546,9 @@
                     marker.report = report;
                     _mapLayer.addMarker(marker);
 
-                    var re=/window.open\('(.*?)'/;
-                    var cameraImgUrl = report.properties.description.match(re)[1];
-                    var $imageDiv = $(marker.icon.imageDiv)
+                    let re=/window.open\('(.*?)'/;
+                    let cameraImgUrl = report.properties.description.match(re)[1];
+                    let $imageDiv = $(marker.icon.imageDiv)
                     .css('cursor', 'pointer')
                     .addClass('ncDotReport')
                     .attr({
@@ -549,13 +560,13 @@
                     .data('cameraId', report.properties.id)
                     .popover({trigger: 'manual', html:true,placement: 'top', template:popoverTemplate})
                     .on('click', function(evt) {
-                        //var $div = $(this);
-                       // var camera = getCamera($div.data('cameraId'));
+                        //let $div = $(this);
+                       // let camera = getCamera($div.data('cameraId'));
                         evt.stopPropagation();
-                        var $div = $(this);
+                        let $div = $(this);
                         hideAllPopovers($div);
                         if ($div.data('state') !== 'pinned') {
-                            var id = $div.data('cameraId');
+                            let id = $div.data('cameraId');
                             $div.data('state', 'pinned');
                             //W.map.moveTo(report.marker.lonlat);
                             $div.popover('show');
@@ -599,8 +610,8 @@
                 this.offset=c||{x: -(this.size.w/2),y: -(this.size.h/2)};
                 this.calculateOffset=d;
                 a=OpenLayers.Util.createUniqueID("OL_Icon_");
-                var div = this.imageDiv=OpenLayers.Util.createAlphaImageDiv(a);
-                $(div.firstChild).removeClass('olAlphaImg');   // LEAVE THIS LINE TO PREVENT WME-HARDHATS SCRIPT FROM TURNING ALL ICONS INTO HARDHAT WAZERS --MAPOMATIC
+                let div = this.imageDiv=OpenLayers.Util.createAlphaImageDiv(a);
+                $(div.firstChild).removeClass('olAlphaImg'); // LEAVE THIS LINE TO PREVENT WME-HARDHATS SCRIPT FROM TURNING ALL ICONS INTO HARDHAT WAZERS --MAPOMATIC
             },
             destroy: function(){ this.erase();OpenLayers.Event.stopObservingElement(this.imageDiv.firstChild);this.imageDiv.innerHTML="";this.imageDiv=null; },
             clone: function(){ return new OpenLayers.Icon(this.url,this.size,this.offset,this.calculateOffset); },
@@ -661,10 +672,7 @@
         });
         $('.nc-dot-refresh-reports').click(function(e) {
             hideAllReportPopovers();
-            fetchReports(processReports);
-            var refreshPopup = $('#nc-dot-refresh-popup');
-            refreshPopup.show();
-            setTimeout(function() { refreshPopup.hide(); }, 1500);
+            fetchReports(true);
             e.stopPropagation();
         });
         $('#tims-id-go').click(onTimsIdGoClick);
@@ -713,7 +721,7 @@
                     $('<span>',{class:'nc-dot-table-label nc-dot-report-count count'})
                 ).append(
                     $('<span>',{class:'nc-dot-table-label nc-dot-table-action right'}).text('Archive all').click(function() {
-                        var r = confirm('Are you sure you want to archive all reports for ' + _settings.state + '?');
+                        let r = confirm('Are you sure you want to archive all reports for ' + _settings.state + '?');
                         if (r===true) {
                             archiveAllReports(false);
                         }
@@ -722,7 +730,7 @@
                     $('<span>', {class:'nc-dot-table-label right'}).text('|')
                 ).append(
                     $('<span>',{class:'nc-dot-table-label nc-dot-table-action right'}).text('Un-Archive all').click(function() {
-                        var r = confirm('Are you sure you want to un-archive all reports for ' + _settings.state + '?');
+                        let r = confirm('Are you sure you want to un-archive all reports for ' + _settings.state + '?');
                         if (r===true) {
                             archiveAllReports(true);
                         }
@@ -742,7 +750,7 @@
                     .append($('<input>', {type:'checkbox',name:'secureSite',id:'secureSite'}).change(function(){
                         saveSettingsToStorage();
                         hideAllReportPopovers();
-                        fetchReports();
+                        fetchReports(true);
                     }))
                     .append($('<label>', {for:'secureSite'}).text('Use secure DOT site?'))
                 )
@@ -752,7 +760,7 @@
         $('<div>', {id: 'nc-dot-refresh-popup',}).text('DOT Reports Refreshed').hide().appendTo($('div#editor-container'));
 
         (function setChecks(settingProps, checkboxIds) {
-            for (var i=0; i<settingProps.length; i++) {
+            for (let i=0; i<settingProps.length; i++) {
                 if (_settings[settingProps[i]]) { $('#' + checkboxIds[i]).attr('checked', 'checked'); }
             }
         })(['hideArchivedReports','hideAllButWeatherReports', 'secureSite'],
@@ -769,9 +777,9 @@
     function initGui() {
         init511ReportsOverlay();
         initUserPanel();
-        fetchReports(processReports);
+        fetchReports(false);
 
-        var classHtml =  [
+        let classHtml = [
             '.nc-dot-table th,td,tr {cursor:pointer;} ',
             '.nc-dot-table .centered {text-align:center;} ',
             '.nc-dot-table th:hover,tr:hover {background-color:aliceblue; outline: -webkit-focus-ring-color auto 5px;} ',
@@ -795,11 +803,11 @@
         W.map.events.register('moveend',null,function() {if (_previousZoom !== W.map.zoom) {hideAllReportPopovers();} _previousZoom=W.map.zoom;});
     }
 
-    var _previousZoom;
+    let _previousZoom;
 
     function loadSettingsFromStorage() {
-        var settingsText = localStorage.getItem(_settingsStoreName);
-        var settings;
+        let settingsText = localStorage.getItem(_settingsStoreName);
+        let settings;
         if (settingsText !== '[object Object]') {
             settings = $.parseJSON(localStorage.getItem(_settingsStoreName));
         }
@@ -826,24 +834,22 @@
         initGui();
         _window.addEventListener('beforeunload', function saveOnClose() { saveSettingsToStorage(); }, false);
         Waze.app.modeController.model.bind('change:mode', onModeChanged);
-        log('Initialized.', 0);
+        log('Initialized.');
     }
 
     function bootstrap() {
-        var wz = _window.W;
-        if (wz && wz.loginManager &&
-            wz.loginManager.events.register &&
-            wz.map && wz.loginManager.isLoggedIn()) {
-            log('Initializing...', 1);
+        let wz = _window.W;
+        if (wz && wz.loginManager && wz.loginManager.user && wz.map) {
+            log('Initializing...');
             init();
         } else {
-            log('Bootstrap failed. Trying again...', 1);
+            log('Bootstrap failed. Trying again...');
             _window.setTimeout(function () {
                 bootstrap();
             }, 1000);
         }
     }
 
-    log('Bootstrap...', 0);
+    log('Bootstrap...');
     bootstrap();
 })();
