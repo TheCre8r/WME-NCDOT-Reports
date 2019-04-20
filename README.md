@@ -14,6 +14,12 @@ v 0.5.2 - Public rerelease
 
 v 0.5.3 - Add TIMS ID entry box
 
+v 2018.09.17.001
+- Fix intermittent bootstrap bug.
+- Remove refresh icon and display "Loading reports..." while reports are being loaded.
+- Only display popup *after* reports have actually loaded.
+- Misc code cleanup.
+
 ## Installation
 
 Install just like any other userscript by clicking this link:
