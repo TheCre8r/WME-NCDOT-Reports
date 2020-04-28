@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         WME North Carolina DOT Reports
 // @namespace    https://greasyfork.org/users/45389
-// @version      2018.09.17.001
+// @version      2020.04.27.001
 // @description  Display NC transportation department reports in WME.
-// @author       MapOMatic and The_Cre8r
+// @author       MapOMatic, The_Cre8r, and ABelter
 // @license      GNU GPLv3
 // @include      /^https:\/\/(www|beta)\.waze\.com\/(?!user\/)(.{2,6}\/)?editor\/?.*$/
 // @grant        GM_xmlhttpRequest
@@ -236,7 +236,7 @@
             let id = $div.data('reportId');
             let report = getReport(id);
             $div.data('state', 'pinned');
-            W.map.moveTo(report.marker.lonlat);
+            W.map.getOLMap().moveTo(report.marker.lonlat);
             $div.popover('show');
             if (report.archived) {
                 $('.btn-archive-dot-report').text("Un-Archive");
@@ -317,7 +317,7 @@
             let marker = getReport(id).marker;
             let $imageDiv = report.imageDiv;
             //if (!marker.onScreen()) {
-            W.map.moveTo(marker.lonlat);
+            W.map.getOLMap().moveTo(marker.lonlat);
             //}
             toggleReportPopover($imageDiv);
 
