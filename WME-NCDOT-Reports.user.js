@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME North Carolina DOT Reports
 // @namespace    https://greasyfork.org/users/45389
-// @version      2020.04.27.002
+// @version      2020.04.27.003
 // @description  Display NC transportation department reports in WME.
 // @author       MapOMatic, The_Cre8r, and ABelter
 // @license      GNU GPLv3
@@ -76,7 +76,7 @@
 
     function formatDateTimeString(dateTimeString) {
         let dt = new Date(dateTimeString);
-        return dt.toLocaleDateString([],{ year: '2-digit', month: 'numeric', day: 'numeric' } ) + ' ' + dt.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        return dt.toLocaleDateString([],{ year: '2-digit', month: 'numeric', day: 'numeric' } ) + ' ' + dt.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false});
     }
 
     function dynamicSort(property) {
