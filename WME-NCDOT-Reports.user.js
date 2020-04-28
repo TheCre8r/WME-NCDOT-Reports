@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME North Carolina DOT Reports
 // @namespace    https://greasyfork.org/users/45389
-// @version      2020.04.27.003
+// @version      2020.04.27.004
 // @description  Display NC transportation department reports in WME.
 // @author       MapOMatic, The_Cre8r, and ABelter
 // @license      GNU GPLv3
@@ -29,14 +29,19 @@
 
     let _window = unsafeWindow ? unsafeWindow : window;
     let _settingsStoreName = 'nc_dot_report_settings';
-    let _alertUpdate = false;
+    let _alertUpdate = true;
     let _scriptVersion = GM_info.script.version;
     let _scriptVersionChanges = [
         GM_info.script.name,
         'v' + _scriptVersion,
         'What\'s New',
         '------------------------------',
-        'It\'s working again!'
+        'It\'s working again!',
+        '- Fixed issue with map jumping when clicking on incidents',
+        '- Added date/time incident last updated in TIMS to table',
+        '- Updated all incident times to 24hr format',
+        '- Updated incident links and descriptions to DriveNC.gov',
+        '- Fixed camera image sizes + added link to view full-size'
     ].join('\n');
 
     let _imagesPath = 'https://github.com/mapomatic/wme-north-carolina-dot-reports/raw/master/images/';
@@ -438,7 +443,7 @@
         content.push('<br><span style="font-weight:bold">Start Time:</span>&nbsp;&nbsp;' + formatDateTimeString(attr.Start) + '<br>');
         content.push('<span style="font-weight:bold">End Time:</span>&nbsp;&nbsp;' + formatDateTimeString(attr.End) + '<br>');
         content.push('<br><span style="font-weight:bold">Last Updated:</span>&nbsp;&nbsp;' + formatDateTimeString(attr.LastUpdate));
-        content.push('<div"><hr style="margin-bottom:5px;margin-top:5px;border-color:gainsboro"><div style="display:table;width:100%"><button type="button" class="btn btn-primary btn-open-dot-report" data-dot-report-url="' + detailsUrl + report.id + '" style="float:left;">Open in DOT website</button><button type="button" title="Copy short description to clipboard" class="btn btn-primary btn-copy-dot-report" data-dot-reportid="' + report.id + '" style="float:left;margin-left:6px;"><span class="fa fa-copy"></button><button type="button" style="float:right;" class="btn btn-primary btn-archive-dot-report" data-dot-report-id="' + report.id + '">Archive</button></div></div></div>');
+        content.push('<div><hr style="margin-bottom:5px;margin-top:5px;border-color:gainsboro"><div style="display:table;width:100%"><button type="button" class="btn btn-primary btn-open-dot-report" data-dot-report-url="' + detailsUrl + report.id + '" style="float:left;">Open in DriveNC.gov</button><button type="button" title="Copy short description to clipboard" class="btn btn-primary btn-copy-dot-report" data-dot-reportid="' + report.id + '" style="float:left;margin-left:6px;"><span class="fa fa-copy"></button><button type="button" style="float:right;" class="btn btn-primary btn-archive-dot-report" data-dot-report-id="' + report.id + '">Archive</button></div></div></div>');
 
         let $imageDiv = $(marker.icon.imageDiv)
         .css('cursor', 'pointer')
@@ -542,7 +547,7 @@
                         icon
                     );
 
-                    let popoverTemplate = ['<div class="reportPopover popover" style="max-width:450px;width:385px;z-index:1000;">',
+                    let popoverTemplate = ['<div class="reportPopover popover" style="max-width:450px;width:385px;">',
                                            '<div class="arrow"></div>',
                                            '<div class="popover-title"></div>',
                                            '<div class="popover-content">',
@@ -553,13 +558,16 @@
 
                     let re=/window.open\('(.*?)'/;
                     let cameraImgUrl = report.properties.description.match(re)[1];
+					let cameraContent = [];
+					cameraContent.push('<img src=' + cameraImgUrl + ' style="max-width:357px">');
+					cameraContent.push('<div><hr style="margin-bottom:5px;margin-top:5px;border-color:gainsboro"><div style="display:table;width:100%"><button type="button" class="btn btn-primary btn-open-camera-img" data-camera-img-url="' + cameraImgUrl + '" style="float:left;">Open Image Full-Size</button></div></div>');
                     let $imageDiv = $(marker.icon.imageDiv)
                     .css('cursor', 'pointer')
                     .addClass('ncDotReport')
                     .attr({
                         'data-toggle':'popover',
                         title:'',
-                        'data-content':$('<img>', {src:cameraImgUrl})[0].outerHTML,
+                        'data-content':cameraContent.join(''),
                         'data-original-title':'<div style"width:100%;"><div style="float:left;max-width:230px;color:#5989af;font-size:120%;">' + report.properties.subtitle + '</div><div style="float:right;"><a class="close-popover" href="javascript:void(0);">X</a></div><div style="clear:both;"</div></div>'
                     })
                     .data('cameraId', report.properties.id)
@@ -575,6 +583,7 @@
                             $div.data('state', 'pinned');
                             //W.map.moveTo(report.marker.lonlat);
                             $div.popover('show');
+							$('.btn-open-camera-img').click(function(evt) {evt.stopPropagation(); window.open($(this).data('cameraImgUrl'),'_blank');});
                             $('.reportPopover,.close-popover').click(function(evt) {
                                 $div.data('state', '');
                                 $div.popover('hide');
@@ -793,7 +802,7 @@
             '.nc-dot-table th,td {border:1px solid gainsboro;} ',
             '.nc-dot-table td,th {color:black; padding:1px 2px;} ',
             '.nc-dot-table th {background-color:gainsboro;} ',
-            '.nc-dot-table .table-img {max-width:18px; max-height:18px;} ',
+            '.nc-dot-table .table-img {max-width:12px; max-height:12px;} ',
             '.tooltip.top > .tooltip-arrow {border-top-color:white;} ',
             '.tooltip.bottom > .tooltip-arrow {border-bottom-color:white;} ',
             'a.close-popover {text-decoration:none;padding:0px 3px;border-width:1px;background-color:white;border-color:ghostwhite} a.close-popover:hover {padding:0px 4px;border-style:outset;border-width:1px;background-color:white;border-color:ghostwhite;} ',
