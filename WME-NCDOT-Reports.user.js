@@ -46,7 +46,7 @@
     let _cameras = [];
     let _lastShownTooltipDiv;
     let _tableSortKeys = [];
-    let _columnSortOrder = ['attributes.Road', 'attributes.Condition', 'attributes.Start', 'attributes.End'];
+    let _columnSortOrder = ['attributes.Road', 'attributes.Condition', 'attributes.Start', 'attributes.End','attributes.LastUpdate'];
     let _reportTitles = {incident: 'INCIDENT'};
     let _mapLayer;
     let _user;
@@ -76,7 +76,7 @@
 
     function formatDateTimeString(dateTimeString) {
         let dt = new Date(dateTimeString);
-        return dt.toLocaleDateString() + ' ' + dt.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        return dt.toLocaleDateString([],{ year: '2-digit', month: 'numeric', day: 'numeric' } ) + ' ' + dt.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
     }
 
     function dynamicSort(property) {
@@ -247,7 +247,7 @@
             $('.btn-copy-dot-report').click(function(evt) {
                 evt.stopPropagation();
                 let id = $(this).data('dotReportid');
-                copyToClipboard(getReport(id).attributes.IncidentType + ' - NCDOT ' + id);
+                copyToClipboard(getReport(id).attributes.IncidentType + ' - DriveNC.gov ' + id);
             });
             //$(".close-popover").click(function() {hideAllReportPopovers();});
             $div.data('report').dataRow.css('background-color','beige');
@@ -309,7 +309,8 @@
             $('<td>').text(report.attributes.Road),
             $('<td>').text(report.attributes.Condition),
             $('<td>').text(formatDateTimeString(report.attributes.Start)),
-            $('<td>').text(formatDateTimeString(report.attributes.End))
+            $('<td>').text(formatDateTimeString(report.attributes.End)),
+            $('<td>').text(formatDateTimeString(report.attributes.LastUpdate))
         )
         .click(function () {
             let $row = $(this);
@@ -343,6 +344,9 @@
             case 'end':
                 prop = 'attributes.End';
                 break;
+            case 'updated':
+                prop = 'attributes.LastUpdate';
+                break;
             case 'archive':
                 prop = 'archived';
                 break;
@@ -371,7 +375,8 @@
                 $('<th>',{id:'nc-dot-table-roadname-header',title:'Sort by road'}).text('Road'),
                 $('<th>',{id:'nc-dot-table-desc-header',title:'Sort by description'}).text('Desc'),
                 $('<th>',{id:'nc-dot-table-start-header',title:'Sort by start date'}).text('Start'),
-                $('<th>',{id:'nc-dot-table-end-header',title:'Sort by end date'}).text('End')
+                $('<th>',{id:'nc-dot-table-end-header',title:'Sort by end date'}).text('End'),
+                $('<th>',{id:'nc-dot-table-updated-header',title:'Sort by updated date'}).text('Updated')
             ));
         _reports.sort(dynamicSortMultiple(_columnSortOrder));
         _reports.forEach(function(report) {
@@ -420,7 +425,7 @@
         //marker.events.register('click', marker, onMarkerClick);
         _mapLayer.addMarker(marker);
 
-        let detailsUrl = 'http://tims.ncdot.gov/TIMS/IncidentDetail.aspx?id=';
+        let detailsUrl = 'https://drivenc.gov/default.aspx?type=incident&id=';
         let eventLookup = {1:"None", 138:"Hurricane Matthew"};
         let content = [];
         content.push('<span style="font-weight:bold">Road:</span>&nbsp;&nbsp;' + removeNull(attr.RoadFullName) + '<br>');
@@ -537,7 +542,7 @@
                         icon
                     );
 
-                    let popoverTemplate = ['<div class="reportPopover popover" style="max-width:450px;width:385px;">',
+                    let popoverTemplate = ['<div class="reportPopover popover" style="max-width:450px;width:385px;z-index:1000;">',
                                            '<div class="arrow"></div>',
                                            '<div class="popover-title"></div>',
                                            '<div class="popover-content">',
@@ -786,9 +791,9 @@
             '.nc-dot-table th:hover {color:blue; border-color:whitesmoke; } ',
             '.nc-dot-table {border:1px solid gray; border-collapse:collapse; width:100%; font-size:83%;margin:0px 0px 0px 0px} ',
             '.nc-dot-table th,td {border:1px solid gainsboro;} ',
-            '.nc-dot-table td,th {color:black; padding:1px 4px;} ',
+            '.nc-dot-table td,th {color:black; padding:1px 2px;} ',
             '.nc-dot-table th {background-color:gainsboro;} ',
-            '.nc-dot-table .table-img {max-width:24px; max-height:24px;} ',
+            '.nc-dot-table .table-img {max-width:18px; max-height:18px;} ',
             '.tooltip.top > .tooltip-arrow {border-top-color:white;} ',
             '.tooltip.bottom > .tooltip-arrow {border-bottom-color:white;} ',
             'a.close-popover {text-decoration:none;padding:0px 3px;border-width:1px;background-color:white;border-color:ghostwhite} a.close-popover:hover {padding:0px 4px;border-style:outset;border-width:1px;background-color:white;border-color:ghostwhite;} ',
