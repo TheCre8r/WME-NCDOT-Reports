@@ -14,11 +14,18 @@ v 0.5.2 - Public rerelease
 
 v 0.5.3 - Add TIMS ID entry box
 
-v 2018.09.17.001
+v 2018.09.17
 - Fix intermittent bootstrap bug.
 - Remove refresh icon and display "Loading reports..." while reports are being loaded.
 - Only display popup *after* reports have actually loaded.
 - Misc code cleanup.
+
+v 2020.04.27
+- Fixed issue with map jumping when clicking on incidents
+- Added date/time incident last updated in TIMS to table
+- Updated all incident times to 24hr format
+- Updated incident links and descriptions to DriveNC.gov
+- Fixed camera image sizes + added link to view full-size
 
 ## Installation
 
@@ -29,6 +36,7 @@ https://github.com/TheCre8r/WME-NCDOT-Reports/raw/master/WME-NCDOT-Reports.user.
 
 * **Mapomatic** - *Initial work and feature requests*
 * **The_Cre8r** - *Compatibility updates*
+* **ABelter** - *Compatibility updates*
 
 ## License
 
