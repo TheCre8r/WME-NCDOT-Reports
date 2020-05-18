@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME North Carolina DOT Reports
 // @namespace    https://greasyfork.org/users/45389
-// @version      2020.04.27.004
+// @version      2020.05.17.001
 // @description  Display NC transportation department reports in WME.
 // @author       MapOMatic, The_Cre8r, and ABelter
 // @license      GNU GPLv3
@@ -36,12 +36,9 @@
         'v' + _scriptVersion,
         'What\'s New',
         '------------------------------',
-        'It\'s working again!',
-        '- Fixed issue with map jumping when clicking on incidents',
-        '- Added date/time incident last updated in TIMS to table',
-        '- Updated all incident times to 24hr format',
-        '- Updated incident links and descriptions to DriveNC.gov',
-        '- Fixed camera image sizes + added link to view full-size'
+        '- Added option to show City and County in description column; when enabled, this column becomes sortable by City name',
+        '- Fixed "Hide All but Weather Events" filter option',
+        '- Added additional filters: Hide Interstates, Hide US Highways, Hide NC Highways, Hide NC Secondary Routes, Hide All but Incidents Updated in the last x days'
     ].join('\n');
 
     let _imagesPath = 'https://github.com/mapomatic/wme-north-carolina-dot-reports/raw/master/images/';
@@ -51,7 +48,7 @@
     let _cameras = [];
     let _lastShownTooltipDiv;
     let _tableSortKeys = [];
-    let _columnSortOrder = ['attributes.Road', 'attributes.Condition', 'attributes.Start', 'attributes.End','attributes.LastUpdate'];
+    let _columnSortOrder = ['attributes.Road', 'attributes.City', 'attributes.Condition', 'attributes.Start', 'attributes.End','attributes.LastUpdate'];
     let _reportTitles = {incident: 'INCIDENT'};
     let _mapLayer;
     let _user;
@@ -69,8 +66,15 @@
                 lastVersion: _scriptVersion,
                 layerVisible: _mapLayer.visibility,
                 state: _settings.state,
-                hideArchivedReports: $('#hideNCDotArchivedReports').is(':checked'),
-                hideAllButReports: $('#hideNCDotAllButWeatherReports').is(':checked'),
+                showCityCountyCheck: $('#settingsShowCityCounty').is(':checked'),
+                hideArchivedReports: $('#settingsHideNCDotArchivedReports').is(':checked'),
+                hideAllButWeatherReports: $('#settingsHideNCDotAllButWeatherReports').is(':checked'),
+                hideInterstatesReports: $('#settingsHideNCDotInterstatesReports').is(':checked'),
+                hideUSHighwaysReports: $('#settingsHideNCDotUSHighwaysReports').is(':checked'),
+                hideNCHighwaysReports: $('#settingsHideNCDotNCHighwaysReports').is(':checked'),
+                hideSRHighwaysReports: $('#settingsHideNCDotSRHighwaysReports').is(':checked'),
+                hideXDaysReports: $('#settingsHideNCDotXDaysReports').is(':checked'),
+                hideXDaysNumber: $('#settingsHideNCDotXDaysNumber').val(),
                 secureSite: $('#secureSite').is(':checked'),
                 archivedReports:_settings.archivedReports
             };
@@ -188,18 +192,32 @@
     }
 
     function isHideOptionChecked(reportType) {
-        return $('#hideNCDot' + reportType + 'Reports').is(':checked');
+        return $('#settingsHideNCDot' + reportType + 'Reports').is(':checked');
     }
 
     function updateReportsVisibility() {
         hideAllReportPopovers();
+        let showCity = $('#settingsShowCityCounty').is(':checked');
         let hideArchived = isHideOptionChecked('Archived');
         let hideAllButWeather = isHideOptionChecked('AllButWeather');
+        let hideInterstates = isHideOptionChecked('Interstates');
+        let hideUSHighways = isHideOptionChecked('USHighways');
+        let hideNCHighways = isHideOptionChecked('NCHighways');
+        let hideSRHighways = isHideOptionChecked('SRHighways');
+        let xDays = $('#settingsHideNCDotXDaysNumber').val();
+        let hideXDays = isHideOptionChecked('XDays') && xDays.length > 0;
+        let xDaysDate = new Date();
+        xDaysDate.setDate( xDaysDate.getDate() - xDays );
         let visibleCount = 0;
         _reports.forEach(function(report) {
             let hide =
                 hideArchived && report.archived ||
-                hideAllButWeather && report.attributes.Expr2 !== 'Weather Event';
+                hideAllButWeather && report.attributes.IncidentType !== 'Weather Event' ||
+                hideInterstates && report.attributes.Road.substring(0,2) == 'I-' ||
+                hideUSHighways && report.attributes.Road.substring(0,3) == 'US-' ||
+                hideNCHighways && report.attributes.Road.substring(0,3) == 'NC-' ||
+                hideSRHighways && report.attributes.Road.substring(0,3) == 'SR-' ||
+                hideXDays && Date.parse(report.attributes.LastUpdate) < Date.parse(xDaysDate);
             if (hide) {
                 report.dataRow.hide();
                 if (report.imageDiv) { report.imageDiv.hide(); }
@@ -209,6 +227,11 @@
                 if (report.imageDiv) { report.imageDiv.show(); }
             }
         });
+        if (showCity) {
+            $('.citycounty').show();
+        } else {
+            $('.citycounty').hide();
+        }
         $('.nc-dot-report-count').text(visibleCount + ' of ' + _reports.length + ' reports');
     }
 
@@ -310,9 +333,9 @@
                     }
                 )
             ),
-            $('<td>',{class:'clickable centered'}).append($img),
+//            $('<td>',{class:'clickable centered'}).append($img),
             $('<td>').text(report.attributes.Road),
-            $('<td>').text(report.attributes.Condition),
+            $('<td>').html('<div class="citycounty" style="border-bottom:1px dotted #dcdcdc;">' + report.attributes.City + ' (' + report.attributes.CountyName + ')</div>' + report.attributes.Condition),
             $('<td>').text(formatDateTimeString(report.attributes.Start)),
             $('<td>').text(formatDateTimeString(report.attributes.End)),
             $('<td>').text(formatDateTimeString(report.attributes.LastUpdate))
@@ -336,6 +359,7 @@
 
     function onClickColumnHeader(obj) {
         let prop;
+        let showCity = $('#settingsShowCityCounty').is(':checked');
         switch (/nc-dot-table-(.*)-header/.exec(obj.id)[1]) {
             case 'roadname':
                 prop = 'attributes.Road';
@@ -344,7 +368,11 @@
                 prop = 'attributes.Start';
                 break;
             case 'desc':
-                prop = 'attributes.Condition';
+                if(showCity) {
+                    prop = 'attributes.City';
+                } else {
+                    prop = 'attributes.Condition';
+                }
                 break;
             case 'end':
                 prop = 'attributes.End';
@@ -376,7 +404,7 @@
             $('<tr>').append(
                 $('<th>', {id:'nc-dot-table-archive-header',class:'centered'}).append(
                     $('<span>', {class:'fa fa-archive',style:'font-size:120%',title:'Sort by archived'}))).append(
-                $('<th>', {id:'nc-dot-table-category-header',title:'Sort by report type'})).append(
+//                $('<th>', {id:'nc-dot-table-category-header',title:'Sort by report type'})).append(
                 $('<th>',{id:'nc-dot-table-roadname-header',title:'Sort by road'}).text('Road'),
                 $('<th>',{id:'nc-dot-table-desc-header',title:'Sort by description'}).text('Desc'),
                 $('<th>',{id:'nc-dot-table-start-header',title:'Sort by start date'}).text('Start'),
@@ -680,7 +708,7 @@
     function restoreUserTab() {
         $('#user-tabs > .nav-tabs').append(_tabDiv.tab);
         $('#user-info > .flex-parent > .tab-content').append(_tabDiv.panel);
-        $('[id^=hideNCDot]').change(function(){
+        $('[id^=settings]').change(function(){
             saveSettingsToStorage();
             updateReportsVisibility();
         });
@@ -716,16 +744,52 @@
                     $('<input>', {id:'tims-id-entry', type:'text', style:'margin-right:4px; height:23px; width:80px;'}),
                     $('<button>', {id:'tims-id-go', style:'height:23px;'}).text('Go')
                 ),
-                $('<label style="width:100%; cursor:pointer; border-bottom: 1px solid #e0e0e0; margin-top:9px;" data-toggle="collapse" data-target="#ncDotSettingsCollapse"><span class="fa fa-caret-down" style="margin-right:5px;font-size:120%;"></span>Hide reports...</label>')).append(
-                $('<div>',{id:'ncDotSettingsCollapse',class:'collapse'}).append(
-                    $('<div>',{class:'controls-container'})
-                    .append($('<input>', {type:'checkbox',name:'hideNCDotArchivedReports',id:'hideNCDotArchivedReports'}))
-                    .append($('<label>', {for:'hideNCDotArchivedReports'}).text('Archived'))
+                $('<label style="width:100%; cursor:pointer; border-bottom: 1px solid #e0e0e0; margin-top:9px;" data-toggle="collapse" data-target="#ncDotSettingsCollapse"><span class="fa fa-caret-down" style="margin-right:5px;font-size:120%;"></span>Settings &amp; Incident Filtering</label>')).append(
+                $('<div>',{id:'ncDotSettingsCollapse',class:'collapse'}
                 ).append(
                     $('<div>',{class:'controls-container'})
-                    .append($('<input>', {type:'checkbox',name:'hideNCDotAllButWeatherReports',id:'hideNCDotAllButWeatherReports'}))
-                    .append($('<label>', {for:'hideNCDotAllButWeatherReports'}).text('All but Weather Events'))
-                )
+                    .append($('<input>', {type:'checkbox',name:'settingsShowCityCounty',id:'settingsShowCityCounty'}))
+                    .append($('<label>', {for:'settingsShowCityCounty'}).text('Show City and County in Table Description'))
+                ).append(
+                    $('<div>',{class:'controls-container',style:'font-weight:bold;display:block;'}).text('Hide Reports... ')
+                ).append(
+                    $('<div>',{class:'controls-container',style:'width:50%; display:inline-block;'})
+					.append(
+						$('<div>',{class:'controls-container'})
+						.append($('<input>', {type:'checkbox',name:'settingsHideNCDotArchivedReports',id:'settingsHideNCDotArchivedReports'}))
+						.append($('<label>', {for:'settingsHideNCDotArchivedReports'}).text('Archived'))
+					).append(
+						$('<div>',{class:'controls-container'})
+						.append($('<input>', {type:'checkbox',name:'settingsHideNCDotAllButWeatherReports',id:'settingsHideNCDotAllButWeatherReports'}))
+						.append($('<label>', {for:'settingsHideNCDotAllButWeatherReports'}).text('All but Weather Events'))
+					)
+					.append(
+						$('<div>',{class:'controls-container'})
+						.append($('<input>', {type:'checkbox',name:'settingsHideNCDotXDaysReports',id:'settingsHideNCDotXDaysReports'}))
+						.append($('<label>', {for:'settingsHideNCDotXDaysReports'}).text('All but Updated in last'))
+						.append($('<input>', {type:'number',min:'1',style:'margin: 0 5px;width:40px;height:23px;',name:'settingsHideNCDotXDaysNumber',id:'settingsHideNCDotXDaysNumber'}))
+						.append($('<label>', {for:'settingsHideNCDotXDaysNumber',style:'font-weight:normal;'}).text(' days'))
+					)
+				).append(
+                    $('<div>',{class:'controls-container',style:'width:50%; display:inline-block;'})
+					.append(
+						$('<div>',{class:'controls-container'})
+						.append($('<input>', {type:'checkbox',name:'settingsHideNCDotInterstatesReports',id:'settingsHideNCDotInterstatesReports'}))
+						.append($('<label>', {for:'settingsHideNCDotInterstatesReports'}).text('Interstates'))
+					).append(
+						$('<div>',{class:'controls-container'})
+						.append($('<input>', {type:'checkbox',name:'settingsHideNCDotUSHighwaysReports',id:'settingsHideNCDotUSHighwaysReports'}))
+						.append($('<label>', {for:'settingsHideNCDotUSHighwaysReports'}).text('US Highways'))
+					).append(
+						$('<div>',{class:'controls-container'})
+						.append($('<input>', {type:'checkbox',name:'settingsHideNCDotNCHighwaysReports',id:'settingsHideNCDotNCHighwaysReports'}))
+						.append($('<label>', {for:'settingsHideNCDotNCHighwaysReports'}).text('NC Highways'))
+					).append(
+						$('<div>',{class:'controls-container'})
+						.append($('<input>', {type:'checkbox',name:'settingsHideNCDotSRHighwaysReports',id:'settingsHideNCDotSRHighwaysReports'}))
+						.append($('<label>', {for:'settingsHideNCDotSRHighwaysReports'}).text('NC Secondary Routes'))
+					)
+				)
             )
         ).append(
             $('<div>', {class:'side-panel-section>', id:'nc-dot-report-table'}).append(
@@ -777,8 +841,9 @@
             for (let i=0; i<settingProps.length; i++) {
                 if (_settings[settingProps[i]]) { $('#' + checkboxIds[i]).attr('checked', 'checked'); }
             }
-        })(['hideArchivedReports','hideAllButWeatherReports', 'secureSite'],
-           ['hideNCDotArchivedReports','hideNCDotAllButWeatherReports', 'secureSite']);
+            $('#settingsHideNCDotXDaysNumber').attr('value', _settings.hideXDaysNumber)
+        })(['showCityCountyCheck','hideArchivedReports','hideAllButWeatherReports','hideInterstatesReports','hideUSHighwaysReports','hideNCHighwaysReports','hideSRHighwaysReports','hideXDaysReports','hideXDaysNumber','secureSite'],
+           ['settingsShowCityCounty','settingsHideNCDotArchivedReports','settingsHideNCDotAllButWeatherReports','settingsHideNCDotInterstatesReports','settingsHideNCDotUSHighwaysReports','settingsHideNCDotNCHighwaysReports','settingsHideNCDotSRHighwaysReports','settingsHideNCDotXDaysReports','settingsHideNCDotXDaysNumber','secureSite']);
     }
 
     function showScriptInfoAlert() {
@@ -829,8 +894,15 @@
             settings = {
                 lastVersion:null,
                 layerVisible:true,
+                showCityCountyCheck:true,
                 hideArchivedReports:true,
                 hideAllButWeatherReports:false,
+                hideInterstatesReports:false,
+                hideUSHighwaysReports:false,
+                hideNCHighwaysReports:false,
+                hideSRHighwaysReports:false,
+                hideXDaysReports:false,
+                hideXDaysNumber:7,
                 archivedReports:{}
             };
         } else {
