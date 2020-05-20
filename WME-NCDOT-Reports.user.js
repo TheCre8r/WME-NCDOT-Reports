@@ -745,7 +745,7 @@
                     $('<button>', {id:'tims-id-go', style:'height:23px;'}).text('Go')
                 ),
                 $('<label style="width:100%; cursor:pointer; border-bottom: 1px solid #e0e0e0; margin-top:9px;" data-toggle="collapse" data-target="#ncDotSettingsCollapse"><span class="fa fa-caret-down" style="margin-right:5px;font-size:120%;"></span>Settings &amp; Incident Filtering</label>')).append(
-                $('<div>',{id:'ncDotSettingsCollapse',class:'collapse'}
+                $('<div>',{id:'ncDotSettingsCollapse',class:'collapse',style:'font-size:12px;'}
                 ).append(
                     $('<div>',{class:'controls-container'})
                     .append($('<input>', {type:'checkbox',name:'settingsShowCityCounty',id:'settingsShowCityCounty'}))
