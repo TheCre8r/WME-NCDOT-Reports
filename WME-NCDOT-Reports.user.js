@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME North Carolina DOT Reports
 // @namespace    https://greasyfork.org/users/45389
-// @version      2020.06.01.001
+// @version      2020.06.07.01
 // @description  Display NC transportation department reports in WME.
 // @author       MapOMatic, The_Cre8r, and ABelter
 // @license      GNU GPLv3
@@ -37,11 +37,12 @@
         'v' + _scriptVersion,
         'What\'s New',
         '------------------------------',
-        '- Added option to show City and County in description column; when enabled, this column becomes sortable by City name',
         '- Fixed "Hide All but Weather Events" filter option',
+        '- Added option to show City and County in description column; when enabled, this column becomes sortable by City name',
+        '- Added Closure Date/Time info from DriveNC API',
+	'- Formatting changes to Incident Pop-up: Moved RTC description and copy button, added DriveNC copy URL button',
         '- Added additional filters: Hide Interstates, Hide US Highways, Hide NC Highways, Hide NC Secondary Routes, Hide All but Incidents Updated in the last x days',
-        '- Formatting changes to Incident Pop-up: Moved RTC description and copy button, added copy DriveNC URL button',
-        '- Converted 24:00 times to 00:00'
+        '- Fixed 24:00 times to 00:00'
     ].join('\n');
 
     let _imagesPath = 'https://github.com/mapomatic/wme-north-carolina-dot-reports/raw/master/images/';
@@ -49,7 +50,6 @@
     let _tabDiv = {}; // stores the user tab div so it can be restored after switching back from Events mode to Default mode
     let _reports = [];
     let _cameras = [];
-    let _detail = [];
     let _lastShownTooltipDiv;
     let _tableSortKeys = [];
     let _columnSortOrder = ['attributes.Road', 'attributes.City', 'attributes.Condition', 'attributes.Start', 'attributes.End','attributes.LastUpdate'];
@@ -269,6 +269,8 @@
             let report = getReport(id);
             $div.data('state', 'pinned');
             W.map.getOLMap().moveTo(report.marker.lonlat);
+            fetchDetails(id);
+            logDebug('Fetching details for ' + id + '...');
             $div.popover('show');
             if (report.archived) {
                 $('.btn-archive-dot-report').text("Un-Archive");
@@ -479,7 +481,7 @@
         //content.push('<span style="font-weight:bold">TIMS ID:</span>&nbsp;&nbsp;' + removeNull(attr.Id) + '<br>');
         content.push('<hr style="margin-bottom:5px;margin-top:5px;border-color:gainsboro"><span style="font-weight:bold">Start Time:</span>&nbsp;&nbsp;' + formatDateTimeString(attr.Start) + '<br>');
         content.push('<span style="font-weight:bold">End Time:</span>&nbsp;&nbsp;' + formatDateTimeString(attr.End) + '<br>');
-        //content.push('<span style="font-weight:bold">Closure Dates/Times:</span>&nbsp;&nbsp;' + removeNull(attr.ConstructionTime) + '<br>');
+        content.push('<div id="datetime"><span style="font-weight:bold">Closure Dates/Times:</span>&nbsp;&nbsp;<span id="closuretime"></span></div>');
         content.push('<hr style="margin-bottom:5px;margin-top:5px;border-color:gainsboro"><span style="font-weight:bold">Last Updated:</span>&nbsp;&nbsp;' + formatDateTimeString(attr.LastUpdate));
         content.push('<div><hr style="margin-bottom:5px;margin-top:5px;border-color:gainsboro"><div style="width:100%;"><span style="font-weight:bold">RTC Description:</span>&nbsp;&nbsp;' + removeNull(attr.IncidentType) + ' - DriveNC.gov ' + report.id + '&nbsp;&nbsp;<button type="button" title="Copy short description to clipboard" class="btn btn-primary btn-copy-dot-report" data-dot-reportid="' + report.id + '" style="margin-left:6px;"><span class="fa fa-copy" /></button></div><hr style="margin-bottom:5px;margin-top:5px;border-color:gainsboro"><div style="display:table;width:100%"><button type="button" class="btn btn-primary btn-open-dot-report" data-dot-report-url="' + detailsUrl + report.id + '" style="float:left;">Open in DriveNC.gov</button><button type="button" title="Copy DriveNC URL to clipboard" class="btn btn-primary btn-copy-report-url" data-dot-reporturl="' + detailsUrl + report.id + '" style="float:left;margin-left:6px;"><span class="fa fa-copy" /> URL</button><button type="button" style="float:right;" class="btn btn-primary btn-archive-dot-report" data-dot-report-id="' + report.id + '">Archive</button></div></div></div>');
 
@@ -502,6 +504,21 @@
         if (report.archived) { $imageDiv.addClass('nc-dot-archived-marker'); }
         report.imageDiv = $imageDiv;
         report.marker = marker;
+    }
+
+    function processDetails(detailsJSON) {
+        let detailHold = {};
+        detailHold.id = detailsJSON.Id;
+        detailHold.attributes = detailsJSON;
+        $('#closuretime').text(detailHold.attributes.ConstructionDateTime);
+    }
+
+    function fetchDetails(reportID) {
+        GM_xmlhttpRequest({
+            method: 'GET',
+            url: DETAILS_URL + reportID,
+            onload: function(res) { processDetails($.parseJSON(res.responseText)) }
+        });
     }
 
     function processReports(reports, showPopupWhenDone) {
