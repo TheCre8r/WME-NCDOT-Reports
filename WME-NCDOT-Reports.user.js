@@ -1,11 +1,12 @@
 // ==UserScript==
 // @name         WME North Carolina DOT Reports
 // @namespace    https://greasyfork.org/users/45389
-// @version      2020.06.07.01
+// @version      2020.06.07.02
 // @description  Display NC transportation department reports in WME.
 // @author       MapOMatic, The_Cre8r, and ABelter
 // @license      GNU GPLv3
 // @include      /^https:\/\/(www|beta)\.waze\.com\/(?!user\/)(.{2,6}\/)?editor\/?.*$/
+// @require https://greasyfork.org/scripts/24851-wazewrap/code/WazeWrap.js
 // @grant        GM_xmlhttpRequest
 // @connect      ncdot.gov
 
@@ -20,29 +21,28 @@
 /* global Waze */
 /* global Components */
 /* global I18n */
+/* global WazeWrap */
 
 (function() {
     'use strict';
 
-    const REPORTS_URL = 'https://tims.ncdot.gov/tims/api/incidents';
-    const DETAILS_URL = 'https://tims.ncdot.gov/tims/api/drivenc/incidents/';
+    const REPORTS_URL = 'https://tims.ncdot.gov/tims/api/incidents/verbose';
     const CAMERAS_URL = 'https://tims.ncdot.gov/tims/API/CameraGeoJSON.aspx?TLatitude=36.552&TLongitude=-84.316&BLatitude=33.800&BLongitude=-75.000';
 
     let _window = unsafeWindow ? unsafeWindow : window;
-    let _settingsStoreName = 'nc_dot_report_settings';
-    let _alertUpdate = true;
-    let _scriptVersion = GM_info.script.version;
-    let _scriptVersionChanges = [
-        GM_info.script.name,
-        'v' + _scriptVersion,
-        'What\'s New',
-        '------------------------------',
-        '- Fixed "Hide All but Weather Events" filter option',
-        '- Added option to show City and County in description column; when enabled, this column becomes sortable by City name',
-        '- Added Closure Date/Time info from DriveNC API',
-	'- Formatting changes to Incident Pop-up: Moved RTC description and copy button, added DriveNC copy URL button',
-        '- Added additional filters: Hide Interstates, Hide US Highways, Hide NC Highways, Hide NC Secondary Routes, Hide All but Incidents Updated in the last x days',
-        '- Fixed 24:00 times to 00:00'
+    const STORE_NAME = "nc_dot_report_settings";
+    const SCRIPT_NAME = GM_info.script.name;
+    const SCRIPT_VERSION = GM_info.script.version.toString();
+    const UPDATE_ALERT = true;
+    const SCRIPT_CHANGES = [
+        '<ul>',
+        '<li>Fixed "Hide All but Weather Events" filter option</li>',
+        '<li>Fixed 24:00 times to 00:00</li>',
+        '<li>Added option to show City and County in description column; when enabled, this column becomes sortable by City name</li>',
+        '<li>Added Closure Date/Time info from DriveNC API</li>',
+        '<li>Added additional filters: Hide Interstates, Hide US Highways, Hide NC Highways, Hide NC Secondary Routes, Hide All but Incidents Updated in the last x days</li>',
+        '<li>Added WazeWrap settings sync</li>',
+        '</ul>'
     ].join('\n');
 
     let _imagesPath = 'https://github.com/mapomatic/wme-north-carolina-dot-reports/raw/master/images/';
@@ -82,7 +82,8 @@
                 secureSite: $('#secureSite').is(':checked'),
                 archivedReports:_settings.archivedReports
             };
-            localStorage.setItem(_settingsStoreName, JSON.stringify(settings));
+            localStorage.setItem(STORE_NAME, JSON.stringify(settings));
+            WazeWrap.Remote.SaveSettings(STORE_NAME, settings);
             logDebug('Settings saved');
         }
     }
@@ -179,7 +180,7 @@
     function copyIncidentIDsToClipboard() {
         let ids = [];
         _reports.forEach(function(report) {
-            ids.push(report.attributes.IncidentID);
+            ids.push(report.attributes.Id);
         });
         return copyToClipboard(ids.join('\n'));
     }
@@ -269,8 +270,6 @@
             let report = getReport(id);
             $div.data('state', 'pinned');
             W.map.getOLMap().moveTo(report.marker.lonlat);
-            fetchDetails(id);
-            logDebug('Fetching details for ' + id + '...');
             $div.popover('show');
             if (report.archived) {
                 $('.btn-archive-dot-report').text("Un-Archive");
@@ -481,7 +480,7 @@
         //content.push('<span style="font-weight:bold">TIMS ID:</span>&nbsp;&nbsp;' + removeNull(attr.Id) + '<br>');
         content.push('<hr style="margin-bottom:5px;margin-top:5px;border-color:gainsboro"><span style="font-weight:bold">Start Time:</span>&nbsp;&nbsp;' + formatDateTimeString(attr.Start) + '<br>');
         content.push('<span style="font-weight:bold">End Time:</span>&nbsp;&nbsp;' + formatDateTimeString(attr.End) + '<br>');
-        content.push('<div id="datetime"><span style="font-weight:bold">Closure Dates/Times:</span>&nbsp;&nbsp;<span id="closuretime"></span></div>');
+        if (attr.ConstructionDateTime) { content.push('<span style="font-weight:bold">Closure Dates/Times:</span>&nbsp;&nbsp;' + removeNull(attr.ConstructionDateTime) + '<br>'); }
         content.push('<hr style="margin-bottom:5px;margin-top:5px;border-color:gainsboro"><span style="font-weight:bold">Last Updated:</span>&nbsp;&nbsp;' + formatDateTimeString(attr.LastUpdate));
         content.push('<div><hr style="margin-bottom:5px;margin-top:5px;border-color:gainsboro"><div style="width:100%;"><span style="font-weight:bold">RTC Description:</span>&nbsp;&nbsp;' + removeNull(attr.IncidentType) + ' - DriveNC.gov ' + report.id + '&nbsp;&nbsp;<button type="button" title="Copy short description to clipboard" class="btn btn-primary btn-copy-dot-report" data-dot-reportid="' + report.id + '" style="margin-left:6px;"><span class="fa fa-copy" /></button></div><hr style="margin-bottom:5px;margin-top:5px;border-color:gainsboro"><div style="display:table;width:100%"><button type="button" class="btn btn-primary btn-open-dot-report" data-dot-report-url="' + detailsUrl + report.id + '" style="float:left;">Open in DriveNC.gov</button><button type="button" title="Copy DriveNC URL to clipboard" class="btn btn-primary btn-copy-report-url" data-dot-reporturl="' + detailsUrl + report.id + '" style="float:left;margin-left:6px;"><span class="fa fa-copy" /> URL</button><button type="button" style="float:right;" class="btn btn-primary btn-archive-dot-report" data-dot-report-id="' + report.id + '">Archive</button></div></div></div>');
 
@@ -504,21 +503,6 @@
         if (report.archived) { $imageDiv.addClass('nc-dot-archived-marker'); }
         report.imageDiv = $imageDiv;
         report.marker = marker;
-    }
-
-    function processDetails(detailsJSON) {
-        let detailHold = {};
-        detailHold.id = detailsJSON.Id;
-        detailHold.attributes = detailsJSON;
-        $('#closuretime').text(detailHold.attributes.ConstructionDateTime);
-    }
-
-    function fetchDetails(reportID) {
-        GM_xmlhttpRequest({
-            method: 'GET',
-            url: DETAILS_URL + reportID,
-            onload: function(res) { processDetails($.parseJSON(res.responseText)) }
-        });
     }
 
     function processReports(reports, showPopupWhenDone) {
@@ -849,7 +833,7 @@
                 $('<div>').append(
                     $('<button type="button" class="btn btn-primary" style="">Copy IDs to clipboard</button>').click(function() {
                         copyIncidentIDsToClipboard();
-                        alert('IDs have been copied to the clipboard.');
+                        WazeWrap.Alerts.success(GM_info.script.name, 'IDs have been copied to the clipboard.');
                     }),
                     $('<div style="margin-left:5px;">',{class:'controls-container'})
                     .append($('<input>', {type:'checkbox',name:'secureSite',id:'secureSite'}).change(function(){
@@ -871,13 +855,6 @@
             $('#settingsHideNCDotXDaysNumber').attr('value', _settings.hideXDaysNumber)
         })(['showCityCountyCheck','hideArchivedReports','hideAllButWeatherReports','hideInterstatesReports','hideUSHighwaysReports','hideNCHighwaysReports','hideSRHighwaysReports','hideXDaysReports','hideXDaysNumber','secureSite'],
            ['settingsShowCityCounty','settingsHideNCDotArchivedReports','settingsHideNCDotAllButWeatherReports','settingsHideNCDotInterstatesReports','settingsHideNCDotUSHighwaysReports','settingsHideNCDotNCHighwaysReports','settingsHideNCDotSRHighwaysReports','settingsHideNCDotXDaysReports','settingsHideNCDotXDaysNumber','secureSite']);
-    }
-
-    function showScriptInfoAlert() {
-        /* Check version and alert on update */
-        if (_alertUpdate && _scriptVersion !== _settings.lastVersion) {
-            alert(_scriptVersionChanges);
-        }
     }
 
     function initGui() {
@@ -911,12 +888,16 @@
 
     let _previousZoom;
 
-    function loadSettingsFromStorage() {
-        let settingsText = localStorage.getItem(_settingsStoreName);
+    async function loadSettingsFromStorage() {
+        let serverSettings = await WazeWrap.Remote.RetrieveSettings(STORE_NAME);
+        let settingsText = localStorage.getItem(STORE_NAME);
         let settings;
         if (settingsText !== '[object Object]') {
-            settings = $.parseJSON(localStorage.getItem(_settingsStoreName));
+            settings = $.parseJSON(localStorage.getItem(STORE_NAME));
         }
+        if(serverSettings && serverSettings.lastSaved > settings.lastSaved)
+            $.extend(settings, serverSettings);
+
         if(!settings) {
             settings = {
                 lastVersion:null,
@@ -930,7 +911,8 @@
                 hideSRHighwaysReports:false,
                 hideXDaysReports:false,
                 hideXDaysNumber:7,
-                archivedReports:{}
+                archivedReports:{},
+                lastSaved: 0
             };
         } else {
             settings.layerVisible = (settings.layerVisible === true);
@@ -940,10 +922,10 @@
         _settings = settings;
     }
 
-    function init() {
+    async function init() {
         _user = W.loginManager.user.userName.toLowerCase();
-        loadSettingsFromStorage();
-        showScriptInfoAlert();
+        await loadSettingsFromStorage();
+        WazeWrap.Interface.ShowScriptUpdate(SCRIPT_NAME, SCRIPT_VERSION, SCRIPT_CHANGES,`" </a><a target="_blank" href='https://github.com/TheCre8r/WME-NCDOT-Reports'>GitHub</a><a style="display:none;" href="`,'');
         initGui();
         _window.addEventListener('beforeunload', function saveOnClose() { saveSettingsToStorage(); }, false);
         Waze.app.modeController.model.bind('change:mode', onModeChanged);
@@ -952,7 +934,7 @@
 
     function bootstrap() {
         let wz = _window.W;
-        if (wz && wz.loginManager && wz.loginManager.user && wz.map) {
+        if (wz && wz.loginManager && wz.loginManager.user && wz.map && WazeWrap.Ready) {
             log('Initializing...');
             init();
         } else {
