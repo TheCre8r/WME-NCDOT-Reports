@@ -27,13 +27,13 @@ v 2020.04.27
 - Updated incident links and descriptions to DriveNC.gov
 - Fixed camera image sizes + added link to view full-size
 
-v 2020.06.01
+v 2020.06.07
 - Added option to show City and County in description column; when enabled, this column becomes sortable by City name
+- Added Closure Date/Time info from DriveNC API
 - Fixed "Hide All but Weather Events" filter option
 - Added additional filters: Hide Interstates, Hide US Highways, Hide NC Highways, Hide NC Secondary Routes, Hide All but Incidents Updated in the last x days
-- Formatting changes to Incident Pop-up: Moved RTC description and copy button, added copy DriveNC URL button
+- Formatting changes to Incident Pop-up: Moved RTC description and copy button, added DriveNC copy URL button
 - Converted 24:00 times to 00:00
-
 
 ## Installation
 
