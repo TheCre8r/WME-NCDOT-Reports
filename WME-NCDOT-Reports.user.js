@@ -18,7 +18,6 @@
 /* global W */
 /* global GM_xmlhttpRequest */
 /* global unsafeWindow */
-/* global Waze */
 /* global Components */
 /* global I18n */
 /* global WazeWrap */
@@ -928,7 +927,7 @@
         WazeWrap.Interface.ShowScriptUpdate(SCRIPT_NAME, SCRIPT_VERSION, SCRIPT_CHANGES,`" </a><a target="_blank" href='https://github.com/TheCre8r/WME-NCDOT-Reports'>GitHub</a><a style="display:none;" href="`,'');
         initGui();
         _window.addEventListener('beforeunload', function saveOnClose() { saveSettingsToStorage(); }, false);
-        Waze.app.modeController.model.bind('change:mode', onModeChanged);
+        W.app.modeController.model.bind('change:mode', onModeChanged);
         log('Initialized.');
     }
 
