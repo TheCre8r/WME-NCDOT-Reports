@@ -410,7 +410,6 @@
                 return;
         }
         if (prop === _lastSort) {
-            //todo: figure out what to call to reverse the sort of the same column
             ++_reSort;
         } else {
             _reSort = 0;
@@ -467,7 +466,7 @@
     function addReportToMap(report){
         let coord = report.geometry;
         let size = new OpenLayers.Size(32,32);
-        let offset = new OpenLayers.Pixel(-(size.w), -(size.h));
+        let offset = new OpenLayers.Pixel(-(size.w/2), -size.h);
         let now = new Date(Date.now());
         let imgName = 'caution.png';
         let attr = report.attributes;
@@ -603,91 +602,6 @@
             method: 'GET',
             url: REPORTS_URL,
             onload: function(res) { processReports($.parseJSON(res.responseText), showPopupWhenDone); }
-        });
-    }
-
-    function fetchCamDetails(id) {
-        let Camera_ID_URL = CAMERAS_URL + id;
-        GM_xmlhttpRequest({
-            method: 'GET',
-            url: Camera_ID_URL,
-            onload: function(res) {
-                let features = JSON.parse(res.responseText).CameraDetails;
-                features.forEach(function(report) {
-                    let camLat = report.Latitude;
-                    let camLon = report.Longitude;
-                    let size = new OpenLayers.Size(32,32);
-                    let offset = new OpenLayers.Pixel(-(size.w/2), -size.h);
-                    let now = new Date(Date.now());
-                    let imgName = 'camera.png';
-                    //let attr = report.CameraDetails;
-
-                    report.imgUrl = _imagesPath + imgName;
-                    let icon = new OpenLayers.Icon(report.imgUrl,size,null);
-                    let marker = new OpenLayers.Marker(
-                        new OpenLayers.LonLat(camLon,camLat).transform(
-                            new OpenLayers.Projection("EPSG:4326"),
-                            W.map.getProjectionObject()
-                        ),
-                        icon
-                    );
-
-                    let popoverTemplate = ['<div class="reportPopover popover" style="max-width:450px;width:385px;">',
-                                           '<div class="arrow"></div>',
-                                           '<div class="popover-title"></div>',
-                                           '<div class="popover-content">',
-                                           '</div>',
-                                           '</div>'].join('');
-                    marker.report = report;
-                    _mapLayer.addMarker(marker);
-
-                    let re=/window.open\('(.*?)'/;
-                    let cameraImgUrl = report.ImageURL;
-                    let cameraContent = [];
-                    cameraContent.push('<img src=' + cameraImgUrl + ' style="max-width:357px">');
-                    cameraContent.push('<div><hr style="margin-bottom:5px;margin-top:5px;border-color:gainsboro"><div style="display:table;width:100%"><button type="button" class="btn btn-primary btn-open-camera-img" data-camera-img-url="' + cameraImgUrl + '" style="float:left;">Open Image Full-Size</button></div></div>');
-                    let $imageDiv = $(marker.icon.imageDiv)
-                    .css('cursor', 'pointer')
-                    .addClass('ncDotReport')
-                    .attr({
-                        'data-toggle':'popover',
-                        title:'',
-                        'data-content':cameraContent.join(''),
-                        'data-original-title':'<div style"width:100%;"><div style="float:left;max-width:230px;color:#5989af;font-size:120%;">' + report.CameraDetails.LocationName + '</div><div style="float:right;"><a class="close-popover" href="javascript:void(0);">X</a></div><div style="clear:both;"</div></div>'
-                    })
-                    .data('cameraId', report.Id)
-                    .popover({trigger: 'manual', html:true,placement: 'top', template:popoverTemplate})
-                    .on('click', function(evt) {
-                        //let $div = $(this);
-                        // let camera = getCamera($div.data('cameraId'));
-                        evt.stopPropagation();
-                        let $div = $(this);
-                        hideAllPopovers($div);
-                        if ($div.data('state') !== 'pinned') {
-                            let id = $div.data('cameraId');
-                            $div.data('state', 'pinned');
-                            //W.map.moveTo(report.marker.lonlat);
-                            $div.popover('show');
-                            $('.btn-open-camera-img').click(function(evt) {evt.stopPropagation(); window.open($(this).data('cameraImgUrl'),'_blank');});
-                            $('.reportPopover,.close-popover').click(function(evt) {
-                                $div.data('state', '');
-                                $div.popover('hide');
-                            });
-                            //$(".close-popover").click(function() {hideAllReportPopovers();});
-                        } else {
-                            $div.data('state', '');
-                            $div.popover('hide');
-                        }
-                    })
-                    .data('cameraId', report.id)
-                    .data('state', '');
-
-                    $imageDiv.data('report', report);
-                    report.imageDiv = $imageDiv;
-                    report.marker = marker;
-                    _cameras.push(report);
-                });
-            }
         });
     }
 
