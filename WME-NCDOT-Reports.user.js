@@ -366,11 +366,6 @@
             //if (!marker.onScreen()) {
             W.map.getOLMap().moveTo(marker.lonlat);
             //}
-            // TESTING - select closest segment
-            //let point = OpenLayers.Geometry.Point(report.attributes.Longitude,report.attributes.Latitude)
-            //let seg = WazeWrap.Geometry.findClosestSegment(point, true, false);
-            //let selectObjs = W.model.segments.getObjectById(seg);
-            //W.selectionManager.setSelectedModels(selectObjs);
             toggleReportPopover($imageDiv);
 
         }).data('reportId', report.id);
