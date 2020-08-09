@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME North Carolina DOT Reports
 // @namespace    https://greasyfork.org/users/45389
-// @version      2020.07.19.01
+// @version      2020.08.09.01
 // @description  Display NC transportation department reports in WME.
 // @author       MapOMatic, The_Cre8r, and ABelter
 // @license      GNU GPLv3
@@ -9,6 +9,7 @@
 // @require https://greasyfork.org/scripts/24851-wazewrap/code/WazeWrap.js
 // @grant        GM_xmlhttpRequest
 // @connect      ncdot.gov
+// @connect      services.arcgis.com
 
 // ==/UserScript==
 
@@ -26,7 +27,7 @@
     'use strict';
 
     const REPORTS_URL = 'https://tims.ncdot.gov/tims/api/incidents/verbose';
-    const CAMERAS_URL = 'https://tims.ncdot.gov/tims/API/CameraGeoJSON.aspx?TLatitude=36.552&TLongitude=-84.316&BLatitude=33.800&BLongitude=-75.000';
+    const CAMERAS_URL = 'https://services.arcgis.com/NuWFvHYDMVmmxMeM/ArcGIS/rest/services/NCDOT_TIMSCameras/FeatureServer/0/query?where=Latitude+%3E+0&objectIds=&time=&geometry=&geometryType=esriGeometryPoint&inSR=&spatialRel=esriSpatialRelIntersects&resultType=none&distance=0.0&units=esriSRUnit_Meter&returnGeodetic=false&outFields=*&returnGeometry=true&featureEncoding=esriDefault&multipatchOption=xyFootprint&maxAllowableOffset=&geometryPrecision=&outSR=&datumTransformation=&applyVCSProjection=false&returnIdsOnly=false&returnUniqueIdsOnly=false&returnCountOnly=false&returnExtentOnly=false&returnQueryGeometry=false&returnDistinctValues=false&cacheHint=false&orderByFields=&groupByFieldsForStatistics=&outStatistics=&having=&resultOffset=&resultRecordCount=&returnZ=false&returnM=false&returnExceededLimitFeatures=true&quantizationParameters=&sqlFormat=none&f=pjson&token='
 
     let _window = unsafeWindow ? unsafeWindow : window;
     const STORE_NAME = "nc_dot_report_settings";
@@ -35,32 +36,39 @@
     const UPDATE_ALERT = true;
     const SCRIPT_CHANGES = [
         '<ul>',
+        '<li>Fixed camera source</li>',
         '<li>Fixed "Hide All but Weather Events" filter option</li>',
         '<li>Fixed 24:00 times to 00:00</li>',
         '<li>Added option to show City and County in description column; when enabled, this column becomes sortable by City name</li>',
-        '<li>Added Closure Date/Time info from DriveNC API</li>',
+        '<li>Added Closure Date/Time info from DriveNC (e.g. daily/nightly closures details)</li>',
         '<li>Added additional filters: Hide Interstates, Hide US Highways, Hide NC Highways, Hide NC Secondary Routes, Hide All but Incidents Updated in the last x days</li>',
-        '<li>Added WazeWrap settings sync</li>',
+        '<li>Added WazeWrap settings sync and alerts (including alerts history)</li>',
+        '<li>Changed default table sorting: now shows most recent updates first</li>',
+        '<li>Improved table sorting: now reversible</li>',
+        '<li>Updated iconography</li>',
         '</ul>'
     ].join('\n');
 
-    let _imagesPath = 'https://github.com/mapomatic/wme-north-carolina-dot-reports/raw/master/images/';
+    let _imagesPath = 'https://github.com/abelter/WME-NCDOT-Reports/raw/master/';
     let _settings = {};
     let _tabDiv = {}; // stores the user tab div so it can be restored after switching back from Events mode to Default mode
-    let _reports = [];
+    let _reportsClosures = [];
+    //let _reportsClearedOrLanes = []; // future functionality
     let _cameras = [];
     let _lastShownTooltipDiv;
     let _tableSortKeys = [];
-    let _columnSortOrder = ['attributes.Road', 'attributes.City', 'attributes.Condition', 'attributes.Start', 'attributes.End','attributes.LastUpdate'];
+    let _columnSortOrder = ['attributes.LastUpdate', 'attributes.Start', 'attributes.End','attributes.Road', 'attributes.Condition','attributes.City'];
     let _reportTitles = {incident: 'INCIDENT'};
     let _mapLayer;
     let _user;
+    let _lastSort;
+    let _reSort = 0;
 
     function log(message) {
-        console.log('NC DOT Reports:', message);
+        console.log('NCDOT Reports:', message);
     }
     function logDebug(message) {
-        console.debug('NC DOT Reports:', message);
+        console.debug('NCDOT Reports:', message);
     }
 
     function saveSettingsToStorage() {
@@ -178,20 +186,20 @@
 
     function copyIncidentIDsToClipboard() {
         let ids = [];
-        _reports.forEach(function(report) {
+        _reportsClosures.forEach(function(report) {
             ids.push(report.attributes.Id);
         });
         return copyToClipboard(ids.join('\n'));
     }
 
     function getReport(reportId) {
-        for (let i=0; i<_reports.length; i++) {
-            if (_reports[i].id === reportId) { return _reports[i]; }
+        for (let i=0; i<_reportsClosures.length; i++) {
+            if (_reportsClosures[i].id === reportId) { return _reportsClosures[i]; }
         }
     }
     function getCamera(cameraId) {
         for (let i=0; i<_cameras.length; i++) {
-            if (_cameras[i].properties.id === cameraId) { return _cameras[i]; }
+            if (_cameras[i].Id === cameraId) { return _cameras[i]; }
         }
     }
 
@@ -213,7 +221,7 @@
         let xDaysDate = new Date();
         xDaysDate.setDate( xDaysDate.getDate() - xDays );
         let visibleCount = 0;
-        _reports.forEach(function(report) {
+        _reportsClosures.forEach(function(report) {
             let hide =
                 hideArchived && report.archived ||
                 hideAllButWeather && report.attributes.IncidentType !== 'Weather Event' ||
@@ -236,11 +244,11 @@
         } else {
             $('.citycounty').hide();
         }
-        $('.nc-dot-report-count').text(visibleCount + ' of ' + _reports.length + ' reports');
+        $('.nc-dot-report-count').text(visibleCount + ' of ' + _reportsClosures.length + ' reports');
     }
 
     function hideAllPopovers($excludeDiv) {
-        _reports.forEach(function(rpt) {
+        _reportsClosures.forEach(function(rpt) {
             let $div = rpt.imageDiv;
             if ((!$excludeDiv || $div[0] !== $excludeDiv[0]) && $div.data('state') === 'pinned') {
                 $div.data('state', '');
@@ -257,7 +265,7 @@
     }
 
     function deselectAllDataRows() {
-        _reports.forEach(function(rpt) {
+        _reportsClosures.forEach(function(rpt) {
             rpt.dataRow.css('background-color','white');
         });
     }
@@ -270,7 +278,8 @@
             $div.data('state', 'pinned');
             W.map.getOLMap().moveTo(report.marker.lonlat);
             $div.popover('show');
-            if (report.archived) {
+            _mapLayer.setZIndex(1000000000); // this is to help make sure the report shows on top of the turn restriction arrow layer
+             if (report.archived) {
                 $('.btn-archive-dot-report').text("Un-Archive");
             }
             $('.btn-archive-dot-report').click(function() {setArchiveReport(report,!report.archived, true); buildTable();});
@@ -287,7 +296,7 @@
                 copyToClipboard(url);
             });
             //$(".close-popover").click(function() {hideAllReportPopovers();});
-            $div.data('report').dataRow.css('background-color','beige');
+            $div.data('report').dataRow.css('background-color','#f1f1f1');
         } else {
             $div.data('state', '');
             $div.popover('hide');
@@ -321,7 +330,7 @@
     }
 
     function archiveAllReports(unarchive) {
-        _reports.forEach(function(report) {
+        _reportsClosures.forEach(function(report) {
             setArchiveReport(report, !unarchive, false);
         });
         saveSettingsToStorage();
@@ -357,6 +366,11 @@
             //if (!marker.onScreen()) {
             W.map.getOLMap().moveTo(marker.lonlat);
             //}
+            // TESTING - select closest segment
+            //let point = OpenLayers.Geometry.Point(report.attributes.Longitude,report.attributes.Latitude)
+            //let seg = WazeWrap.Geometry.findClosestSegment(point, true, false);
+            //let selectObjs = W.model.segments.getObjectById(seg);
+            //W.selectionManager.setSelectedModels(selectObjs);
             toggleReportPopover($imageDiv);
 
         }).data('reportId', report.id);
@@ -395,6 +409,12 @@
             default:
                 return;
         }
+        if (prop === _lastSort) {
+            //todo: figure out what to call to reverse the sort of the same column
+            ++_reSort;
+        } else {
+            _reSort = 0;
+        }
         let idx = _columnSortOrder.indexOf(prop);
         if (idx > -1) {
             _columnSortOrder.splice(idx, 1);
@@ -403,6 +423,7 @@
             _columnSortOrder.reverse();
             buildTable();
         }
+        _lastSort = prop;
     }
 
     function buildTable() {
@@ -420,8 +441,12 @@
                 $('<th>',{id:'nc-dot-table-end-header',title:'Sort by end date'}).text('End'),
                 $('<th>',{id:'nc-dot-table-updated-header',title:'Sort by updated date'}).text('Updated')
             ));
-        _reports.sort(dynamicSortMultiple(_columnSortOrder));
-        _reports.forEach(function(report) {
+        _reportsClosures.sort(dynamicSortMultiple(_columnSortOrder));
+        _reportsClosures.reverse();
+        if ( _reSort % 2 == 1) {
+            _reportsClosures.reverse();
+        }
+        _reportsClosures.forEach(function(report) {
             addRow($table, report);
         });
         $('.nc-dot-table').remove();
@@ -441,10 +466,10 @@
 
     function addReportToMap(report){
         let coord = report.geometry;
-        let size = new OpenLayers.Size(24,24);
-        let offset = new OpenLayers.Pixel(-(size.w/2), -size.h);
+        let size = new OpenLayers.Size(32,32);
+        let offset = new OpenLayers.Pixel(-(size.w), -(size.h));
         let now = new Date(Date.now());
-        let imgName = 'caution.gif';
+        let imgName = 'caution.png';
         let attr = report.attributes;
 
         report.imgUrl = _imagesPath + imgName;
@@ -506,7 +531,8 @@
 
     function processReports(reports, showPopupWhenDone) {
         let reportIDs = {};
-        _reports = [];
+        _reportsClosures = [];
+        //_reportsClearedOrLanes = [];
         _cameras = [];
         _mapLayer.clearMarkers();
         fetchCameras();
@@ -518,6 +544,14 @@
             'Road Closed',
             'Road Closed with Detour',
             'Road Impassable'
+        ];
+        let conditionFilter2 = [
+            'Lane Closed',
+            'Lanes Closed',
+            'Moving Closure',
+            'Congestion',
+            'Shoulder Closed',
+            'Cleared'
         ];
         reports.forEach(function(reportDetails) {
             if (!reportIDs.hasOwnProperty(reportDetails.Id)) {
@@ -536,18 +570,29 @@
                         }
                     }
                     addReportToMap(report);
-                    _reports.push(report);
+                    _reportsClosures.push(report);
+                }
+                if (conditionFilter2.indexOf(report.attributes.Condition) > -1) {
+                    report.attributes.RoadFullName = report.attributes.Road + (report.attributes.CommonName && (report.attributes.CommonName !== report.attributes.Road) ? '  (' + report.attributes.CommonName + ')' : '');
+                    report.archived = false;
+                    if (_settings.archivedReports.hasOwnProperty(report.id)) {
+                        if ( _settings.archivedReports[report.id].lastUpdateDate < report.lastUpdateDate) {
+                            delete _settings.archivedReports[report.id];
+                        } else {
+                            report.archived = true;
+                        }
+                    }
+                    //addReportToMap(report);
+                    //_reportsClearedOrLanes.push(report);
                 }
             }
         });
         buildTable();
         $('.nc-dot-refresh-reports').css({'display': 'inline-block'});
         if (showPopupWhenDone) {
-            let refreshPopup = $('#nc-dot-refresh-popup');
-            refreshPopup.show();
-            setTimeout(() => refreshPopup.hide(), 1500);
+            WazeWrap.Alerts.success(GM_info.script.name, 'DOT Reports Refreshed');
         }
-        logDebug('Added ' + _reports.length + ' reports to map.');
+        logDebug('Added ' + _reportsClosures.length + ' reports to map.');
     }
 
     function fetchReports(showPopupWhenDone) {
@@ -561,24 +606,26 @@
         });
     }
 
-    function fetchCameras() {
+    function fetchCamDetails(id) {
+        let Camera_ID_URL = CAMERAS_URL + id;
         GM_xmlhttpRequest({
             method: 'GET',
-            url: CAMERAS_URL,
+            url: Camera_ID_URL,
             onload: function(res) {
-                let features = $.parseJSON(res.responseText).features;
+                let features = JSON.parse(res.responseText).CameraDetails;
                 features.forEach(function(report) {
-                    let coord = report.geometry.coordinates;
-                    let size = new OpenLayers.Size(24,24);
+                    let camLat = report.Latitude;
+                    let camLon = report.Longitude;
+                    let size = new OpenLayers.Size(32,32);
                     let offset = new OpenLayers.Pixel(-(size.w/2), -size.h);
                     let now = new Date(Date.now());
                     let imgName = 'camera.png';
-                    let attr = report.attributes;
+                    //let attr = report.CameraDetails;
 
                     report.imgUrl = _imagesPath + imgName;
                     let icon = new OpenLayers.Icon(report.imgUrl,size,null);
                     let marker = new OpenLayers.Marker(
-                        new OpenLayers.LonLat(coord[0],coord[1]).transform(
+                        new OpenLayers.LonLat(camLon,camLat).transform(
                             new OpenLayers.Projection("EPSG:4326"),
                             W.map.getProjectionObject()
                         ),
@@ -595,7 +642,89 @@
                     _mapLayer.addMarker(marker);
 
                     let re=/window.open\('(.*?)'/;
-                    let cameraImgUrl = report.properties.description.match(re)[1];
+                    let cameraImgUrl = report.ImageURL;
+                    let cameraContent = [];
+                    cameraContent.push('<img src=' + cameraImgUrl + ' style="max-width:357px">');
+                    cameraContent.push('<div><hr style="margin-bottom:5px;margin-top:5px;border-color:gainsboro"><div style="display:table;width:100%"><button type="button" class="btn btn-primary btn-open-camera-img" data-camera-img-url="' + cameraImgUrl + '" style="float:left;">Open Image Full-Size</button></div></div>');
+                    let $imageDiv = $(marker.icon.imageDiv)
+                    .css('cursor', 'pointer')
+                    .addClass('ncDotReport')
+                    .attr({
+                        'data-toggle':'popover',
+                        title:'',
+                        'data-content':cameraContent.join(''),
+                        'data-original-title':'<div style"width:100%;"><div style="float:left;max-width:230px;color:#5989af;font-size:120%;">' + report.CameraDetails.LocationName + '</div><div style="float:right;"><a class="close-popover" href="javascript:void(0);">X</a></div><div style="clear:both;"</div></div>'
+                    })
+                    .data('cameraId', report.Id)
+                    .popover({trigger: 'manual', html:true,placement: 'top', template:popoverTemplate})
+                    .on('click', function(evt) {
+                        //let $div = $(this);
+                        // let camera = getCamera($div.data('cameraId'));
+                        evt.stopPropagation();
+                        let $div = $(this);
+                        hideAllPopovers($div);
+                        if ($div.data('state') !== 'pinned') {
+                            let id = $div.data('cameraId');
+                            $div.data('state', 'pinned');
+                            //W.map.moveTo(report.marker.lonlat);
+                            $div.popover('show');
+                            $('.btn-open-camera-img').click(function(evt) {evt.stopPropagation(); window.open($(this).data('cameraImgUrl'),'_blank');});
+                            $('.reportPopover,.close-popover').click(function(evt) {
+                                $div.data('state', '');
+                                $div.popover('hide');
+                            });
+                            //$(".close-popover").click(function() {hideAllReportPopovers();});
+                        } else {
+                            $div.data('state', '');
+                            $div.popover('hide');
+                        }
+                    })
+                    .data('cameraId', report.id)
+                    .data('state', '');
+
+                    $imageDiv.data('report', report);
+                    report.imageDiv = $imageDiv;
+                    report.marker = marker;
+                    _cameras.push(report);
+                });
+            }
+        });
+    }
+
+    function fetchCameras() {
+        GM_xmlhttpRequest({
+            method: 'GET',
+            url: CAMERAS_URL,
+            onload: function(res) {
+                let features = $.parseJSON(res.responseText).features;
+                features.forEach(function(report) {
+                    let size = new OpenLayers.Size(32,32);
+                    let offset = new OpenLayers.Pixel(-(size.w/2), -size.h);
+                    let now = new Date(Date.now());
+                    let imgName = 'camera.png';
+                    let attr = report.attributes;
+
+                    report.imgUrl = _imagesPath + imgName;
+                    let icon = new OpenLayers.Icon(report.imgUrl,size,null);
+                    let marker = new OpenLayers.Marker(
+                        new OpenLayers.LonLat(attr.Longitude,attr.Latitude).transform(
+                            new OpenLayers.Projection("EPSG:4326"),
+                            W.map.getProjectionObject()
+                        ),
+                        icon
+                    );
+
+                    let popoverTemplate = ['<div class="reportPopover popover" style="max-width:450px;width:385px;">',
+                                           '<div class="arrow"></div>',
+                                           '<div class="popover-title"></div>',
+                                           '<div class="popover-content">',
+                                           '</div>',
+                                           '</div>'].join('');
+                    marker.report = report;
+                    _mapLayer.addMarker(marker);
+
+                    let re=/window.open\('(.*?)'/;
+                    let cameraImgUrl = attr.Link;
 					let cameraContent = [];
 					cameraContent.push('<img src=' + cameraImgUrl + ' style="max-width:357px">');
 					cameraContent.push('<div><hr style="margin-bottom:5px;margin-top:5px;border-color:gainsboro"><div style="display:table;width:100%"><button type="button" class="btn btn-primary btn-open-camera-img" data-camera-img-url="' + cameraImgUrl + '" style="float:left;">Open Image Full-Size</button></div></div>');
@@ -606,9 +735,9 @@
                         'data-toggle':'popover',
                         title:'',
                         'data-content':cameraContent.join(''),
-                        'data-original-title':'<div style"width:100%;"><div style="float:left;max-width:230px;color:#5989af;font-size:120%;">' + report.properties.subtitle + '</div><div style="float:right;"><a class="close-popover" href="javascript:void(0);">X</a></div><div style="clear:both;"</div></div>'
+                        'data-original-title':'<div style"width:100%;"><div style="float:left;max-width:230px;color:#5989af;font-size:120%;">' + attr.Location + '</div><div style="float:right;"><a class="close-popover" href="javascript:void(0);">X</a></div><div style="clear:both;"</div></div>'
                     })
-                    .data('cameraId', report.properties.id)
+                    .data('cameraId', attr.OBJECTID)
                     .popover({trigger: 'manual', html:true,placement: 'top', template:popoverTemplate})
                     .on('click', function(evt) {
                         //let $div = $(this);
@@ -632,7 +761,7 @@
                             $div.popover('hide');
                         }
                     })
-                    .data('cameraId', report.id)
+                    .data('cameraId', attr.OBJECTID)
                     .data('state', '');
 
                     $imageDiv.data('report', report);
@@ -659,7 +788,7 @@
             initialize: function(a,b,c,d){
                 this.url=a;
                 this.size=b||{w: 20,h: 20};
-                this.offset=c||{x: -(this.size.w/2),y: -(this.size.h/2)};
+                this.offset=c||{x: -(this.size.w/2),y: -(this.size.h)};
                 this.calculateOffset=d;
                 a=OpenLayers.Util.createUniqueID("OL_Icon_");
                 let div = this.imageDiv=OpenLayers.Util.createAlphaImageDiv(a);
@@ -691,13 +820,14 @@
 
     function init511ReportsOverlay(){
         installIcon();
-        _mapLayer = new OpenLayers.Layer.Markers("NC DOT Reports", {
+        _mapLayer = new OpenLayers.Layer.Markers("NCDOT Reports", {
             displayInLayerSwitcher: true,
             uniqueName: "__ncDotReports",
         });
-        //I18n.translations.en.layers.name.__stateDotReports = "NC DOT Reports";
+        //I18n.translations.en.layers.name.__stateDotReports = "NCDOT Reports";
         W.map.addLayer(_mapLayer);
         _mapLayer.setVisibility(_settings.layerVisible);
+        _mapLayer.setZIndex(100000);
         _mapLayer.events.register('visibilitychanged',null,onLayerVisibilityChanged);
     }
 
@@ -705,12 +835,15 @@
         let $entry = $('#tims-id-entry');
         let id = $entry.val().trim();
         if (id.length > 0) {
-            let report = _reports.find(rpt => rpt.id.toString() === id)
+            let report = _reportsClosures.find(rpt => rpt.id.toString() === id)
             if (report) {
                 report.dataRow.click();
+                $entry.css({'background-color':'#afa'});
+                setTimeout(() => $entry.css({'background-color':'#fff'}), 1500);
+                setTimeout(() => $entry.val(''), 1500);
             } else {
                 $entry.css({'background-color':'#faa'});
-                setTimeout(() => $entry.css({'background-color':'#fff'}), 1000);
+                setTimeout(() => $entry.css({'background-color':'#fff'}), 1500);
             };
         }
     }
@@ -744,16 +877,27 @@
 
     function initUserPanel() {
         _tabDiv.tab = $('<li>').append(
-            $('<a>', {'data-toggle':'tab', href:'#sidepanel-nc-statedot'}).text('NC DOT')
+            $('<a>', {'data-toggle':'tab', href:'#sidepanel-nc-statedot'}).text('NCDOT')
         );
 
         _tabDiv.panel = $('<div>', {class:'tab-pane', id:'sidepanel-nc-statedot'}).append(
             $('<div>', {class:'side-panel-section>'}).append(
                 $('<div>').append(
-                    $('<span>', {style:'margin-right:4px;'}).text('TIMS ID:'),
-                    $('<input>', {id:'tims-id-entry', type:'text', style:'margin-right:4px; height:23px; width:80px;'}),
+                    $('<ul>', {id:'ncdot-tabs', class:'nav nav-tabs'}).append(
+                        $('<li>',{class:'active',style:'text-align: center; height: 30px;'}).append(
+                            $('<a>',{id:'ncdot-tabstitle-closures',style:'height: 30px;',href:'#ncdot-tabs-closures','data-toggle':'tab'}).text('Closures'))
+                        //).append(
+                        //$('<li>',{style:'text-align: center; height: 30px;'}).append(
+                        //    $('<a>',{id:'ncdot-tabstitle-cleared',style:'height: 30px;',href:'#ncdot-tabs-cleared','data-toggle':'tab'}).text('Cleared'))
+                        )
+                    ),
+                $('<div>').append(
+                    $('<span>', {style:'margin-right:4px;'}).text('Jump to Incident:'),
+                    $('<input>', {id:'tims-id-entry', type:'text', style:'margin-right:4px; height:23px; width:80px;', placeholder:'TIMS ID'}),
                     $('<button>', {id:'tims-id-go', style:'height:23px;'}).text('Go')
                 ),
+                $('<div>',{id:'ncdot-tab-content',class:'tab-content'}).append(
+                    $('<section>',{id:'ncdot-tabs-closures',class:'tab-pane active'}).append(
                 $('<label style="width:100%; cursor:pointer; border-bottom: 1px solid #e0e0e0; margin-top:9px;" data-toggle="collapse" data-target="#ncDotSettingsCollapse"><span class="fa fa-caret-down" style="margin-right:5px;font-size:120%;"></span>Settings &amp; Incident Filtering</label>')).append(
                 $('<div>',{id:'ncDotSettingsCollapse',class:'collapse',style:'font-size:12px;'}
                 ).append(
@@ -763,7 +907,7 @@
                 ).append(
                     $('<div>',{class:'controls-container',style:'font-weight:bold;display:block;'}).text('Hide Reports... ')
                 ).append(
-                    $('<div>',{class:'controls-container',style:'width:50%; display:inline-block;'})
+                    $('<div>',{class:'controls-container',style:'width:60%; display:inline-block;'})
 					.append(
 						$('<div>',{class:'controls-container'})
 						.append($('<input>', {type:'checkbox',name:'settingsHideNCDotArchivedReports',id:'settingsHideNCDotArchivedReports'}))
@@ -781,7 +925,7 @@
 						.append($('<label>', {for:'settingsHideNCDotXDaysNumber',style:'font-weight:normal;'}).text(' days'))
 					)
 				).append(
-                    $('<div>',{class:'controls-container',style:'width:50%; display:inline-block;'})
+                    $('<div>',{class:'controls-container',style:'width:40%; display:inline-block;'})
 					.append(
 						$('<div>',{class:'controls-container'})
 						.append($('<input>', {type:'checkbox',name:'settingsHideNCDotInterstatesReports',id:'settingsHideNCDotInterstatesReports'}))
@@ -797,7 +941,7 @@
 					).append(
 						$('<div>',{class:'controls-container'})
 						.append($('<input>', {type:'checkbox',name:'settingsHideNCDotSRHighwaysReports',id:'settingsHideNCDotSRHighwaysReports'}))
-						.append($('<label>', {for:'settingsHideNCDotSRHighwaysReports'}).text('NC Secondary Routes'))
+						.append($('<label>', {for:'settingsHideNCDotSRHighwaysReports'}).text('NC SRs'))
 					)
 				)
             )
@@ -809,23 +953,23 @@
                     $('<span>',{class:'nc-dot-table-label nc-dot-report-count count'})
                 ).append(
                     $('<span>',{class:'nc-dot-table-label nc-dot-table-action right'}).text('Archive all').click(function() {
-                        let r = confirm('Are you sure you want to archive all reports for ' + _settings.state + '?');
-                        if (r===true) {
-                            archiveAllReports(false);
-                        }
+                        WazeWrap.Alerts.confirm(GM_info.script.name, "Are you sure you want to archive all reports?", () => {
+                            archiveAllReports(false)
+                        },null);
                     })
                 ).append(
                     $('<span>', {class:'nc-dot-table-label right'}).text('|')
                 ).append(
                     $('<span>',{class:'nc-dot-table-label nc-dot-table-action right'}).text('Un-Archive all').click(function() {
-                        let r = confirm('Are you sure you want to un-archive all reports for ' + _settings.state + '?');
-                        if (r===true) {
-                            archiveAllReports(true);
-                        }
+                        WazeWrap.Alerts.confirm(GM_info.script.name, "Are you sure you want to un-archive all reports?", () => {
+                            archiveAllReports(true)
+                        },null);
                     })
                 )
             )
-        );
+        )
+                )
+            );
 
         if (_user === 's18slider' || _user === 'the_cre8r' || _user === 'mapomatic') {
             _tabDiv.panel.prepend(
@@ -845,7 +989,6 @@
             );
         }
         restoreUserTab();
-        $('<div>', {id: 'nc-dot-refresh-popup',}).text('DOT Reports Refreshed').hide().appendTo($('div#editor-container'));
 
         (function setChecks(settingProps, checkboxIds) {
             for (let i=0; i<settingProps.length; i++) {
@@ -876,7 +1019,7 @@
             'a.close-popover {text-decoration:none;padding:0px 3px;border-width:1px;background-color:white;border-color:ghostwhite} a.close-popover:hover {padding:0px 4px;border-style:outset;border-width:1px;background-color:white;border-color:ghostwhite;} ',
             '#nc-dot-refresh-popup {position:absolute;z-index:9999;top:80px;left:650px;background-color:rgb(120,176,191);e;font-size:120%;padding:3px 11px;box-shadow:6px 8px rgba(20,20,20,0.6);border-radius:5px;color:white;} ',
             '.refreshIcon:hover {color:blue; text-shadow: 2px 2px #aaa;} .refreshIcon:active{ text-shadow: 0px 0px; }',
-            '.nc-dot-archived-marker {opacity:0.5;} ',
+            '.nc-dot-archived-marker {opacity:0.6;} ',
             '.nc-dot-table-label {font-size:85%;} .nc-dot-table-action:hover {color:blue;cursor:pointer} .nc-dot-table-label.right {float:right} .nc-dot-table-label.count {margin-left:4px;}'
         ].join('');
         $('<style type="text/css">' + classHtml + '</style>').appendTo('head');
@@ -894,9 +1037,9 @@
         if (settingsText !== '[object Object]') {
             settings = $.parseJSON(localStorage.getItem(STORE_NAME));
         }
-        if(serverSettings && serverSettings.lastSaved > settings.lastSaved)
+        if(serverSettings && serverSettings.lastSaved > settings.lastSaved){
             $.extend(settings, serverSettings);
-
+        }
         if(!settings) {
             settings = {
                 lastVersion:null,
