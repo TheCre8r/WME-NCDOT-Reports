@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME North Carolina DOT Reports
 // @namespace    https://greasyfork.org/users/45389
-// @version      2020.08.09.01
+// @version      2020.08.15.01
 // @description  Display NC transportation department reports in WME.
 // @author       MapOMatic, The_Cre8r, and ABelter
 // @license      GNU GPLv3
@@ -36,7 +36,7 @@
     const UPDATE_ALERT = true;
     const SCRIPT_CHANGES = [
         '<ul>',
-        '<li>Fixed camera source</li>',
+        '<li>Fixed camera source; added image refresh functionality</li>',
         '<li>Fixed "Hide All but Weather Events" filter option</li>',
         '<li>Fixed 24:00 times to 00:00</li>',
         '<li>Added option to show City and County in description column; when enabled, this column becomes sortable by City name</li>',
@@ -634,9 +634,10 @@
 
                     let re=/window.open\('(.*?)'/;
                     let cameraImgUrl = attr.Link;
+                    let timestamp = new Date().getTime(); //append timestamp as query string to force a new image instead of cache each time a camera pop-up is opened
 					let cameraContent = [];
-					cameraContent.push('<img src=' + cameraImgUrl + ' style="max-width:357px">');
-					cameraContent.push('<div><hr style="margin-bottom:5px;margin-top:5px;border-color:gainsboro"><div style="display:table;width:100%"><button type="button" class="btn btn-primary btn-open-camera-img" data-camera-img-url="' + cameraImgUrl + '" style="float:left;">Open Image Full-Size</button></div></div>');
+					cameraContent.push('<img id="camera-img" src=' + cameraImgUrl + '&t=' + timestamp + ' style="max-width:352px">');
+					cameraContent.push('<div><hr style="margin-bottom:5px;margin-top:5px;border-color:gainsboro"><div style="display:table;width:100%"><button type="button" class="btn btn-primary btn-open-camera-img" data-camera-img-url="' + cameraImgUrl + '" style="float:left;">Open Image Full-Size</button><button type="button" class="btn btn-primary btn-refresh-camera-img" data-camera-img-url="' + cameraImgUrl + '" style="float:right;"><span class="fa fa-refresh" /></button></div></div>');
                     let $imageDiv = $(marker.icon.imageDiv)
                     .css('cursor', 'pointer')
                     .addClass('ncDotReport')
@@ -660,6 +661,7 @@
                             //W.map.moveTo(report.marker.lonlat);
                             $div.popover('show');
 							$('.btn-open-camera-img').click(function(evt) {evt.stopPropagation(); window.open($(this).data('cameraImgUrl'),'_blank');});
+							$('.btn-refresh-camera-img').click(function(evt) {evt.stopPropagation(); document.getElementById('camera-img').src = $(this).data('cameraImgUrl') + "&t=" + new Date().getTime();});
                             $('.reportPopover,.close-popover').click(function(evt) {
                                 $div.data('state', '');
                                 $div.popover('hide');
@@ -928,7 +930,7 @@
             'a.close-popover {text-decoration:none;padding:0px 3px;border-width:1px;background-color:white;border-color:ghostwhite} a.close-popover:hover {padding:0px 4px;border-style:outset;border-width:1px;background-color:white;border-color:ghostwhite;} ',
             '#nc-dot-refresh-popup {position:absolute;z-index:9999;top:80px;left:650px;background-color:rgb(120,176,191);e;font-size:120%;padding:3px 11px;box-shadow:6px 8px rgba(20,20,20,0.6);border-radius:5px;color:white;} ',
             '.refreshIcon:hover {color:blue; text-shadow: 2px 2px #aaa;} .refreshIcon:active{ text-shadow: 0px 0px; }',
-            '.nc-dot-archived-marker {opacity:0.6;} ',
+            '.nc-dot-archived-marker {opacity:0.5;} ',
             '.nc-dot-table-label {font-size:85%;} .nc-dot-table-action:hover {color:blue;cursor:pointer} .nc-dot-table-label.right {float:right} .nc-dot-table-label.count {margin-left:4px;}'
         ].join('');
         $('<style type="text/css">' + classHtml + '</style>').appendTo('head');
