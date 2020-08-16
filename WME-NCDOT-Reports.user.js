@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME North Carolina DOT Reports
 // @namespace    https://greasyfork.org/users/45389
-// @version      2020.08.15.02
+// @version      2020.08.15.03
 // @description  Display NC transportation department reports in WME.
 // @author       MapOMatic, The_Cre8r, and ABelter
 // @license      GNU GPLv3
@@ -97,7 +97,12 @@
 
     function formatDateTimeString(dateTimeString) {
         let dt = new Date(dateTimeString);
-        return dt.toLocaleDateString([],{ year: '2-digit', month: 'numeric', day: 'numeric' } ) + ' ' + dt.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false}).replace('24:','00:');
+        return dt.toLocaleDateString([],{ weekday: 'short', month: '2-digit', day: '2-digit', year: 'numeric' } ) + ' ' + dt.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false}).replace('24:','00:');
+    }
+
+    function formatDateTimeStringTable(dateTimeString) {
+        let dt = new Date(dateTimeString);
+        return dt.toLocaleDateString([],{ month: 'numeric', day: 'numeric', year: '2-digit' } ) + ' ' + dt.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false}).replace('24:','00:');
     }
 
     function dynamicSort(property) {
@@ -354,9 +359,9 @@
 //            $('<td>',{class:'clickable centered'}).append($img),
             $('<td>').text(report.attributes.Road),
             $('<td>').html('<div class="citycounty" style="border-bottom:1px dotted #dcdcdc;">' + report.attributes.City + ' (' + report.attributes.CountyName + ')</div>' + report.attributes.Condition),
-            $('<td>').text(formatDateTimeString(report.attributes.Start)),
-            $('<td>').text(formatDateTimeString(report.attributes.End)),
-            $('<td>').text(formatDateTimeString(report.attributes.LastUpdate))
+            $('<td>').text(formatDateTimeStringTable(report.attributes.Start)),
+            $('<td>').text(formatDateTimeStringTable(report.attributes.End)),
+            $('<td>').text(formatDateTimeStringTable(report.attributes.LastUpdate))
         )
         .click(function () {
             let $row = $(this);
@@ -489,18 +494,24 @@
         let detailsUrl = 'https://drivenc.gov/default.aspx?type=incident&id=';
         let eventLookup = {1:"None", 138:"Hurricane Matthew"};
         let content = [];
-        content.push('<span style="font-weight:bold">Road:</span>&nbsp;&nbsp;' + removeNull(attr.RoadFullName) + '<br>');
-        content.push('<span style="font-weight:bold">City:</span>&nbsp;&nbsp;' + removeNull(attr.City) + '  (' + removeNull(attr.CountyName) + ' County)<br>');
-        content.push('<span style="font-weight:bold">Location:</span>&nbsp;&nbsp;' + removeNull(attr.Location) + '<br>');
-        content.push('<span style="font-weight:bold">Reason:</span>&nbsp;&nbsp;' + removeNull(attr.Reason) + '<br>');
-        //content.push('<span style="font-weight:bold">DOT Notes:</span>&nbsp;&nbsp;' + attr.DOTNotes + '<br>');
+        content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Road:</div><div class="nc-dot-popover-data">' + removeNull(attr.RoadFullName) + '</div></div>');
+        content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">City:</div><div class="nc-dot-popover-data">' + removeNull(attr.City) + '  (' + removeNull(attr.CountyName) + ' County)</div></div>');
+        content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Location:</div><div class="nc-dot-popover-data">' + removeNull(attr.Location) + '</div></div>');
+        content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Reason:</div><div class="nc-dot-popover-data">' + removeNull(attr.Reason) + '</div></div>');
         //if (eventLookup.hasOwnProperty(attr.EventID)) { content.push('<span style="font-weight:bold">Event Name:</span>&nbsp;&nbsp;' + eventLookup[attr.EventID] + '<br>'); }
         //content.push('<span style="font-weight:bold">TIMS ID:</span>&nbsp;&nbsp;' + removeNull(attr.Id) + '<br>');
-        content.push('<hr style="margin-bottom:5px;margin-top:5px;border-color:gainsboro"><span style="font-weight:bold">Start Time:</span>&nbsp;&nbsp;' + formatDateTimeString(attr.Start) + '<br>');
-        content.push('<span style="font-weight:bold">End Time:</span>&nbsp;&nbsp;' + formatDateTimeString(attr.End) + '<br>');
-        if (attr.ConstructionDateTime) { content.push('<span style="font-weight:bold">Closure Dates/Times:</span>&nbsp;&nbsp;' + removeNull(attr.ConstructionDateTime) + '<br>'); }
-        content.push('<hr style="margin-bottom:5px;margin-top:5px;border-color:gainsboro"><span style="font-weight:bold">Last Updated:</span>&nbsp;&nbsp;' + formatDateTimeString(attr.LastUpdate));
-        content.push('<div><hr style="margin-bottom:5px;margin-top:5px;border-color:gainsboro"><div style="width:100%;"><span style="font-weight:bold">RTC Description:</span>&nbsp;&nbsp;' + removeNull(attr.IncidentType) + ' - DriveNC.gov ' + report.id + '&nbsp;&nbsp;<button type="button" title="Copy short description to clipboard" class="btn btn-primary btn-copy-dot-report" data-dot-reportid="' + report.id + '" style="margin-left:6px;"><span class="fa fa-copy" /></button></div><hr style="margin-bottom:5px;margin-top:5px;border-color:gainsboro"><div style="display:table;width:100%"><button type="button" class="btn btn-primary btn-open-dot-report" data-dot-report-url="' + detailsUrl + report.id + '" style="float:left;">Open in DriveNC.gov</button><button type="button" title="Copy DriveNC URL to clipboard" class="btn btn-primary btn-copy-report-url" data-dot-reporturl="' + detailsUrl + report.id + '" style="float:left;margin-left:6px;"><span class="fa fa-copy" /> URL</button><button type="button" style="float:right;" class="btn btn-primary btn-archive-dot-report" data-dot-report-id="' + report.id + '">Archive</button></div></div></div>');
+        content.push('<hr style="margin:4px 0px; border-color:#dcdcdc">');
+        content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Start Time:</div><div class="nc-dot-popover-data" style="font-family:monospace">' + formatDateTimeString(attr.Start) + '</div></div>');
+        content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">End Time:</div><div class="nc-dot-popover-data" style="font-family:monospace">' + formatDateTimeString(attr.End) + '</div></div>');
+        if (attr.ConstructionDateTime) {
+            content.push('<hr style="margin:4px 0px; border-color:#dcdcdc">');
+            content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Closure Date/Time:</div><div class="nc-dot-popover-data">' + removeNull(attr.ConstructionDateTime) + '</div></div>');
+        }
+        content.push('<hr style="margin:4px 0px; border-color:#dcdcdc">');
+        content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Last Updated:</div><div class="nc-dot-popover-data" style="font-family:monospace">' + formatDateTimeString(attr.LastUpdate) + '</div></div>');
+        content.push('<hr style="margin:4px 0px; border-color:#dcdcdc">');
+        content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label" style="padding-top: 4px;">RTC Description:</div><div class="nc-dot-popover-data">' + removeNull(attr.IncidentType).replace('Night Time','Nighttime') + ' - DriveNC.gov ' + report.id + '&nbsp;&nbsp;<button type="button" title="Copy short description to clipboard" class="btn btn-primary btn-copy-dot-report" data-dot-reportid="' + report.id + '" style="margin-left:6px;"><span class="fa fa-copy" /></button></div></div>');
+        content.push('<hr style="margin:5px 0px; border-color:#dcdcdc"><div style="display:table;width:100%"><button type="button" class="btn btn-primary btn-open-dot-report" data-dot-report-url="' + detailsUrl + report.id + '" style="float:left;">Open in DriveNC.gov</button><button type="button" title="Copy DriveNC URL to clipboard" class="btn btn-primary btn-copy-report-url" data-dot-reporturl="' + detailsUrl + report.id + '" style="float:left;margin-left:6px;"><span class="fa fa-copy" /> URL</button><button type="button" style="float:right;" class="btn btn-primary btn-archive-dot-report" data-dot-report-id="' + report.id + '">Archive</button></div></div></div>');
 
         let $imageDiv = $(marker.icon.imageDiv)
         .css('cursor', 'pointer')
@@ -584,7 +595,7 @@
         buildTable();
         $('.nc-dot-refresh-reports').css({'display': 'inline-block'});
         if (showPopupWhenDone) {
-            WazeWrap.Alerts.success(GM_info.script.name, 'DOT Reports Refreshed');
+            WazeWrap.Alerts.success(SCRIPT_NAME, 'DOT Reports Refreshed');
         }
         logDebug('Added ' + _reportsClosures.length + ' reports to map.');
     }
@@ -636,7 +647,7 @@
                     let cameraImgUrl = attr.Link;
 					let cameraContent = [];
 					cameraContent.push('<img id="camera-img-'+ attr.OBJECTID +'" src=' + cameraImgUrl + '&t=' + new Date().getTime() + ' style="max-width:352px">');
-					cameraContent.push('<div><hr style="margin-bottom:5px;margin-top:5px;border-color:gainsboro"><div style="display:table;width:100%"><button type="button" class="btn btn-primary btn-open-camera-img" data-camera-img-url="' + cameraImgUrl + '" style="float:left;">Open Image Full-Size</button><button type="button" class="btn btn-primary btn-refresh-camera-img" data-camera-img-url="' + cameraImgUrl + '" style="float:right;"><span class="fa fa-refresh" /></button></div></div>');
+					cameraContent.push('<div><hr style="margin:5px 0px;border-color:#dcdcdc"><div style="display:table;width:100%"><button type="button" class="btn btn-primary btn-open-camera-img" data-camera-img-url="' + cameraImgUrl + '" style="float:left;">Open Image Full-Size</button><button type="button" class="btn btn-primary btn-refresh-camera-img" data-camera-img-url="' + cameraImgUrl + '" style="float:right;"><span class="fa fa-refresh" /></button></div></div>');
                     let $imageDiv = $(marker.icon.imageDiv)
                     .css('cursor', 'pointer')
                     .addClass('ncDotReport')
@@ -864,7 +875,7 @@
                     $('<span>',{class:'nc-dot-table-label nc-dot-report-count count'})
                 ).append(
                     $('<span>',{class:'nc-dot-table-label nc-dot-table-action right'}).text('Archive all').click(function() {
-                        WazeWrap.Alerts.confirm(GM_info.script.name, "Are you sure you want to archive all reports?", () => {
+                        WazeWrap.Alerts.confirm(SCRIPT_NAME, "Are you sure you want to archive all reports?", () => {
                             archiveAllReports(false)
                         },null);
                     })
@@ -872,7 +883,7 @@
                     $('<span>', {class:'nc-dot-table-label right'}).text('|')
                 ).append(
                     $('<span>',{class:'nc-dot-table-label nc-dot-table-action right'}).text('Un-Archive all').click(function() {
-                        WazeWrap.Alerts.confirm(GM_info.script.name, "Are you sure you want to un-archive all reports?", () => {
+                        WazeWrap.Alerts.confirm(SCRIPT_NAME, "Are you sure you want to un-archive all reports?", () => {
                             archiveAllReports(true)
                         },null);
                     })
@@ -887,7 +898,7 @@
                 $('<div>').append(
                     $('<button type="button" class="btn btn-primary" style="">Copy IDs to clipboard</button>').click(function() {
                         copyIncidentIDsToClipboard();
-                        WazeWrap.Alerts.success(GM_info.script.name, 'IDs have been copied to the clipboard.');
+                        WazeWrap.Alerts.success(SCRIPT_NAME, 'IDs have been copied to the clipboard.');
                     }),
                     $('<div style="margin-left:5px;">',{class:'controls-container'})
                     .append($('<input>', {type:'checkbox',name:'secureSite',id:'secureSite'}).change(function(){
@@ -921,9 +932,9 @@
             '.nc-dot-table th:hover,tr:hover {background-color:aliceblue; outline: -webkit-focus-ring-color auto 5px;} ',
             '.nc-dot-table th:hover {color:blue; border-color:whitesmoke; } ',
             '.nc-dot-table {border:1px solid gray; border-collapse:collapse; width:100%; font-size:83%;margin:0px 0px 0px 0px} ',
-            '.nc-dot-table th,td {border:1px solid gainsboro;} ',
+            '.nc-dot-table th,td {border:1px solid #dcdcdc;} ',
             '.nc-dot-table td,th {color:black; padding:1px 2px;} ',
-            '.nc-dot-table th {background-color:gainsboro;} ',
+            '.nc-dot-table th {background-color:#dcdcdc;} ',
             '.nc-dot-table .table-img {max-width:12px; max-height:12px;} ',
             '.tooltip.top > .tooltip-arrow {border-top-color:white;} ',
             '.tooltip.bottom > .tooltip-arrow {border-bottom-color:white;} ',
@@ -931,7 +942,10 @@
             '#nc-dot-refresh-popup {position:absolute;z-index:9999;top:80px;left:650px;background-color:rgb(120,176,191);e;font-size:120%;padding:3px 11px;box-shadow:6px 8px rgba(20,20,20,0.6);border-radius:5px;color:white;} ',
             '.refreshIcon:hover {color:blue; text-shadow: 2px 2px #aaa;} .refreshIcon:active{ text-shadow: 0px 0px; }',
             '.nc-dot-archived-marker {opacity:0.5;} ',
-            '.nc-dot-table-label {font-size:85%;} .nc-dot-table-action:hover {color:blue;cursor:pointer} .nc-dot-table-label.right {float:right} .nc-dot-table-label.count {margin-left:4px;}'
+            '.nc-dot-table-label {font-size:85%;} .nc-dot-table-action:hover {color:blue;cursor:pointer} .nc-dot-table-label.right {float:right} .nc-dot-table-label.count {margin-left:4px;}',
+            '.nc-dot-popover-cont {display: flex;}',
+            '.nc-dot-popover-label {font-weight:bold; width: 115px; display: inline-block;}',
+            '.nc-dot-popover-data {flex: 1;}',
         ].join('');
         $('<style type="text/css">' + classHtml + '</style>').appendTo('head');
 
