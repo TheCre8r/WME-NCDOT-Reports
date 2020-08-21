@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME North Carolina DOT Reports
 // @namespace    https://greasyfork.org/users/45389
-// @version      2020.08.15.03
+// @version      2020.08.21.01
 // @description  Display NC transportation department reports in WME.
 // @author       MapOMatic, The_Cre8r, and ABelter
 // @license      GNU GPLv3
@@ -37,15 +37,15 @@
     const SCRIPT_CHANGES = [
         '<ul>',
         '<li>Fixed camera source; added image refresh functionality</li>',
-        '<li>Fixed "Hide All but Weather Events" filter option</li>',
         '<li>Fixed 24:00 times to 00:00</li>',
-        '<li>Added option to show City and County in description column; when enabled, this column becomes sortable by City name</li>',
-        '<li>Added Closure Date/Time info from DriveNC (e.g. daily/nightly closures details)</li>',
+        '<li>Fixed "Hide All but Weather Events" filter option</li>',
+        '<li>Fixed automatic un-archive if TIMS incident updated</li>',
         '<li>Added additional filters: Hide Interstates, Hide US Highways, Hide NC Highways, Hide NC Secondary Routes, Hide All but Incidents Updated in the last x days</li>',
+        '<li>Added option to show City and County in description column; when enabled, this column becomes sortable by City name</li>',
+        '<li>Added Closure Date/Time info from DriveNC when available (e.g. daily/nightly closures details)</li>',
+        '<li>Table sorting: Changed default sort to show most recent updates first; sorting is now reversible</li>',
         '<li>Added WazeWrap settings sync and alerts (including alerts history)</li>',
-        '<li>Changed default table sorting: now shows most recent updates first</li>',
-        '<li>Improved table sorting: now reversible</li>',
-        '<li>Updated iconography</li>',
+        '<li>Fresh coat of paint: Updated icons, buttons, colors</li>',
         '</ul>'
     ].join('\n');
 
@@ -86,7 +86,6 @@
                 hideSRHighwaysReports: $('#settingsHideNCDotSRHighwaysReports').is(':checked'),
                 hideXDaysReports: $('#settingsHideNCDotXDaysReports').is(':checked'),
                 hideXDaysNumber: $('#settingsHideNCDotXDaysNumber').val(),
-                secureSite: $('#secureSite').is(':checked'),
                 archivedReports:_settings.archivedReports
             };
             localStorage.setItem(STORE_NAME, JSON.stringify(settings));
@@ -293,7 +292,7 @@
             $('.btn-copy-dot-report').click(function(evt) {
                 evt.stopPropagation();
                 let id = $(this).data('dotReportid');
-                copyToClipboard(getReport(id).attributes.IncidentType + ' - DriveNC.gov ' + id);
+                copyToClipboard(getReport(id).attributes.IncidentType.replace('Night Time','Nighttime') + ' - DriveNC.gov ' + id);
             });
             $('.btn-copy-report-url').click(function(evt) {
                 evt.stopPropagation();
@@ -321,7 +320,7 @@
     function setArchiveReport(report, archive, updateUi) {
         report.archived = archive;
         if (archive) {
-            _settings.archivedReports[report.id] = {lastUpdated: report.attributes.LastUpdateDate};
+            _settings.archivedReports[report.id] = {lastUpdated: report.attributes.LastUpdate};
             report.imageDiv.addClass('nc-dot-archived-marker');
         }else {
             delete _settings.archivedReports[report.id];
@@ -501,17 +500,17 @@
         //if (eventLookup.hasOwnProperty(attr.EventID)) { content.push('<span style="font-weight:bold">Event Name:</span>&nbsp;&nbsp;' + eventLookup[attr.EventID] + '<br>'); }
         //content.push('<span style="font-weight:bold">TIMS ID:</span>&nbsp;&nbsp;' + removeNull(attr.Id) + '<br>');
         content.push('<hr style="margin:4px 0px; border-color:#dcdcdc">');
-        content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Start Time:</div><div class="nc-dot-popover-data" style="font-family:monospace">' + formatDateTimeString(attr.Start) + '</div></div>');
-        content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">End Time:</div><div class="nc-dot-popover-data" style="font-family:monospace">' + formatDateTimeString(attr.End) + '</div></div>');
+        content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Start Time:</div><div class="nc-dot-popover-data monospace">' + formatDateTimeString(attr.Start) + '</div></div>');
+        content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">End Time:</div><div class="nc-dot-popover-data monospace">' + formatDateTimeString(attr.End) + '</div></div>');
         if (attr.ConstructionDateTime) {
             content.push('<hr style="margin:4px 0px; border-color:#dcdcdc">');
-            content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Closure Date/Time:</div><div class="nc-dot-popover-data">' + removeNull(attr.ConstructionDateTime) + '</div></div>');
+            content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Closure Date/Time:</div><div class="nc-dot-popover-data monospace" >' + removeNull(attr.ConstructionDateTime) + '</div></div>');
         }
         content.push('<hr style="margin:4px 0px; border-color:#dcdcdc">');
-        content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Last Updated:</div><div class="nc-dot-popover-data" style="font-family:monospace">' + formatDateTimeString(attr.LastUpdate) + '</div></div>');
+        content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Last Updated:</div><div class="nc-dot-popover-data monospace">' + formatDateTimeString(attr.LastUpdate) + '</div></div>');
         content.push('<hr style="margin:4px 0px; border-color:#dcdcdc">');
-        content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label" style="padding-top: 4px;">RTC Description:</div><div class="nc-dot-popover-data">' + removeNull(attr.IncidentType).replace('Night Time','Nighttime') + ' - DriveNC.gov ' + report.id + '&nbsp;&nbsp;<button type="button" title="Copy short description to clipboard" class="btn btn-primary btn-copy-dot-report" data-dot-reportid="' + report.id + '" style="margin-left:6px;"><span class="fa fa-copy" /></button></div></div>');
-        content.push('<hr style="margin:5px 0px; border-color:#dcdcdc"><div style="display:table;width:100%"><button type="button" class="btn btn-primary btn-open-dot-report" data-dot-report-url="' + detailsUrl + report.id + '" style="float:left;">Open in DriveNC.gov</button><button type="button" title="Copy DriveNC URL to clipboard" class="btn btn-primary btn-copy-report-url" data-dot-reporturl="' + detailsUrl + report.id + '" style="float:left;margin-left:6px;"><span class="fa fa-copy" /> URL</button><button type="button" style="float:right;" class="btn btn-primary btn-archive-dot-report" data-dot-report-id="' + report.id + '">Archive</button></div></div></div>');
+        content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label" style="padding-top: 6px;">RTC Description:</div><div class="nc-dot-popover-data">' + removeNull(attr.IncidentType).replace('Night Time','Nighttime') + ' - DriveNC.gov ' + report.id + '&nbsp;&nbsp;<button type="button" title="Copy short description to clipboard" class="btn-dot btn-dot-secondary btn-copy-dot-report" data-dot-reportid="' + report.id + '" style="margin-left:6px;"><span class="fa fa-copy" /></button></div></div>');
+        content.push('<hr style="margin:5px 0px; border-color:#dcdcdc"><div style="display:table;width:100%"><button type="button" class="btn-dot btn-dot-primary btn-open-dot-report" data-dot-report-url="' + detailsUrl + report.id + '" style="float:left;">Open in DriveNC.gov</button><button type="button" title="Copy DriveNC URL to clipboard" class="btn-dot btn-dot-secondary btn-copy-report-url" data-dot-reporturl="' + detailsUrl + report.id + '" style="float:left;margin-left:6px;"><span class="fa fa-copy" /> URL</button><button type="button" style="float:right;" class="btn-dot btn-dot-primary btn-archive-dot-report" data-dot-report-id="' + report.id + '">Archive</button></div></div></div>');
 
         let $imageDiv = $(marker.icon.imageDiv)
         .css('cursor', 'pointer')
@@ -520,7 +519,7 @@
             'data-toggle':'popover',
             title:'',
             'data-content':content.join(''),
-            'data-original-title':'<div style"width:100%;"><div style="float:left;max-width:330px;color:#5989af;font-size:120%;"><strong>' + attr.Id + ':</strong>&nbsp;' + attr.RoadFullName + ' - ' + attr.Condition + '</div><div style="float:right;"><a class="close-popover" href="javascript:void(0);">X</a></div><div style="clear:both;"</div></div>'
+            'data-original-title':'<div style"width:100%;"><div class="dot-header"><strong>' + attr.Id + ':</strong>&nbsp;' + attr.RoadFullName + ' - ' + attr.Condition + '</div><div style="float:right;"><a class="close-popover" href="javascript:void(0);">X</a></div><div style="clear:both;"</div></div>'
         })
 
         .popover({trigger: 'manual', html:true,placement: 'auto top', template:popoverTemplate})
@@ -568,7 +567,7 @@
                     report.attributes.RoadFullName = report.attributes.Road + (report.attributes.CommonName && (report.attributes.CommonName !== report.attributes.Road) ? '  (' + report.attributes.CommonName + ')' : '');
                     report.archived = false;
                     if (_settings.archivedReports.hasOwnProperty(report.id)) {
-                        if ( _settings.archivedReports[report.id].lastUpdateDate < report.lastUpdateDate) {
+                        if ( _settings.archivedReports[report.id].lastUpdated != report.attributes.LastUpdate) {
                             delete _settings.archivedReports[report.id];
                         } else {
                             report.archived = true;
@@ -581,7 +580,7 @@
                     report.attributes.RoadFullName = report.attributes.Road + (report.attributes.CommonName && (report.attributes.CommonName !== report.attributes.Road) ? '  (' + report.attributes.CommonName + ')' : '');
                     report.archived = false;
                     if (_settings.archivedReports.hasOwnProperty(report.id)) {
-                        if ( _settings.archivedReports[report.id].lastUpdateDate < report.lastUpdateDate) {
+                        if ( _settings.archivedReports[report.id].lastUpdated != report.attributes.LastUpdate) {
                             delete _settings.archivedReports[report.id];
                         } else {
                             report.archived = true;
@@ -595,7 +594,7 @@
         buildTable();
         $('.nc-dot-refresh-reports').css({'display': 'inline-block'});
         if (showPopupWhenDone) {
-            WazeWrap.Alerts.success(SCRIPT_NAME, 'DOT Reports Refreshed');
+            WazeWrap.Alerts.success(SCRIPT_NAME, 'Reports Refreshed - ' + formatDateTimeStringTable(new Date(Date.now())));
         }
         logDebug('Added ' + _reportsClosures.length + ' reports to map.');
     }
@@ -603,11 +602,14 @@
     function fetchReports(showPopupWhenDone) {
         logDebug('Fetching reports...');
         $('.nc-dot-report-count').text('Loading reports...');
-        $('.nc-dot-refresh-reports').css({'display': 'none'});
+        $('.nc-dot-refresh-reports').toggleClass("fa-spin");
         GM_xmlhttpRequest({
             method: 'GET',
             url: REPORTS_URL,
-            onload: function(res) { processReports($.parseJSON(res.responseText), showPopupWhenDone); }
+            onload: function(res) {
+                processReports($.parseJSON(res.responseText), showPopupWhenDone);
+                $('.nc-dot-refresh-reports').toggleClass("fa-spin");
+            }
         });
     }
 
@@ -647,7 +649,7 @@
                     let cameraImgUrl = attr.Link;
 					let cameraContent = [];
 					cameraContent.push('<img id="camera-img-'+ attr.OBJECTID +'" src=' + cameraImgUrl + '&t=' + new Date().getTime() + ' style="max-width:352px">');
-					cameraContent.push('<div><hr style="margin:5px 0px;border-color:#dcdcdc"><div style="display:table;width:100%"><button type="button" class="btn btn-primary btn-open-camera-img" data-camera-img-url="' + cameraImgUrl + '" style="float:left;">Open Image Full-Size</button><button type="button" class="btn btn-primary btn-refresh-camera-img" data-camera-img-url="' + cameraImgUrl + '" style="float:right;"><span class="fa fa-refresh" /></button></div></div>');
+					cameraContent.push('<div><hr style="margin:5px 0px;border-color:#dcdcdc"><div style="display:table;width:100%"><button type="button" class="btn-dot btn-dot-primary btn-open-camera-img" data-camera-img-url="' + cameraImgUrl + '" style="float:left;">Open Image Full-Size</button><button type="button" class="btn-dot btn-dot-primary btn-refresh-camera-img" data-camera-img-url="' + cameraImgUrl + '" style="float:right;"><span class="fa fa-refresh" /></button></div></div>');
                     let $imageDiv = $(marker.icon.imageDiv)
                     .css('cursor', 'pointer')
                     .addClass('ncDotReport')
@@ -655,7 +657,7 @@
                         'data-toggle':'popover',
                         title:'',
                         'data-content':cameraContent.join(''),
-                        'data-original-title':'<div style"width:100%;"><div style="float:left;max-width:230px;color:#5989af;font-size:120%;">' + attr.Location + '</div><div style="float:right;"><a class="close-popover" href="javascript:void(0);">X</a></div><div style="clear:both;"</div></div>'
+                        'data-original-title':'<div style"width:100%;"><div class="dot-header camera">' + attr.Location + '</div><div style="float:right;"><a class="close-popover" href="javascript:void(0);">X</a></div><div style="clear:both;"</div></div>'
                     })
                     .data('cameraId', attr.OBJECTID)
                     .popover({trigger: 'manual', html:true,placement: 'top', template:popoverTemplate})
@@ -813,10 +815,10 @@
                         //    $('<a>',{id:'ncdot-tabstitle-cleared',style:'height: 30px;',href:'#ncdot-tabs-cleared','data-toggle':'tab'}).text('Cleared'))
                         )
                     ),
-                $('<div>').append(
-                    $('<span>', {style:'margin-right:4px;'}).text('Jump to Incident:'),
-                    $('<input>', {id:'tims-id-entry', type:'text', style:'margin-right:4px; height:23px; width:80px;', placeholder:'TIMS ID'}),
-                    $('<button>', {id:'tims-id-go', style:'height:23px;'}).text('Go')
+                $('<div>', {style:'width: 100%; text-align:center;'}).append(
+                    $('<span>', {id:'tims-id-label'}).text('Jump to Incident:'),
+                    $('<input>', {id:'tims-id-entry', type:'text', placeholder:'TIMS ID'}),
+                    $('<button>', {id:'tims-id-go', class:'btn-dot btn-dot-primary'}).text('Go')
                 ),
                 $('<div>',{id:'ncdot-tab-content',class:'tab-content'}).append(
                     $('<section>',{id:'ncdot-tabs-closures',class:'tab-pane active'}).append(
@@ -880,7 +882,7 @@
                         },null);
                     })
                 ).append(
-                    $('<span>', {class:'nc-dot-table-label right'}).text('|')
+                    $('<span>', {class:'nc-dot-table-label right', style:'padding:0px 2px;'}).text('|')
                 ).append(
                     $('<span>',{class:'nc-dot-table-label nc-dot-table-action right'}).text('Un-Archive all').click(function() {
                         WazeWrap.Alerts.confirm(SCRIPT_NAME, "Are you sure you want to un-archive all reports?", () => {
@@ -896,17 +898,10 @@
         if (_user === 's18slider' || _user === 'the_cre8r' || _user === 'mapomatic') {
             _tabDiv.panel.prepend(
                 $('<div>').append(
-                    $('<button type="button" class="btn btn-primary" style="">Copy IDs to clipboard</button>').click(function() {
+                    $('<button type="button" class="btn-dot btn-dot-primary" style="">Copy IDs to clipboard</button>').click(function() {
                         copyIncidentIDsToClipboard();
                         WazeWrap.Alerts.success(SCRIPT_NAME, 'IDs have been copied to the clipboard.');
-                    }),
-                    $('<div style="margin-left:5px;">',{class:'controls-container'})
-                    .append($('<input>', {type:'checkbox',name:'secureSite',id:'secureSite'}).change(function(){
-                        saveSettingsToStorage();
-                        hideAllReportPopovers();
-                        fetchReports(true);
-                    }))
-                    .append($('<label>', {for:'secureSite'}).text('Use secure DOT site?'))
+                    })
                 )
             );
         }
@@ -917,8 +912,8 @@
                 if (_settings[settingProps[i]]) { $('#' + checkboxIds[i]).attr('checked', 'checked'); }
             }
             $('#settingsHideNCDotXDaysNumber').attr('value', _settings.hideXDaysNumber)
-        })(['showCityCountyCheck','hideArchivedReports','hideAllButWeatherReports','hideInterstatesReports','hideUSHighwaysReports','hideNCHighwaysReports','hideSRHighwaysReports','hideXDaysReports','hideXDaysNumber','secureSite'],
-           ['settingsShowCityCounty','settingsHideNCDotArchivedReports','settingsHideNCDotAllButWeatherReports','settingsHideNCDotInterstatesReports','settingsHideNCDotUSHighwaysReports','settingsHideNCDotNCHighwaysReports','settingsHideNCDotSRHighwaysReports','settingsHideNCDotXDaysReports','settingsHideNCDotXDaysNumber','secureSite']);
+        })(['showCityCountyCheck','hideArchivedReports','hideAllButWeatherReports','hideInterstatesReports','hideUSHighwaysReports','hideNCHighwaysReports','hideSRHighwaysReports','hideXDaysReports','hideXDaysNumber'],
+           ['settingsShowCityCounty','settingsHideNCDotArchivedReports','settingsHideNCDotAllButWeatherReports','settingsHideNCDotInterstatesReports','settingsHideNCDotUSHighwaysReports','settingsHideNCDotNCHighwaysReports','settingsHideNCDotSRHighwaysReports','settingsHideNCDotXDaysReports','settingsHideNCDotXDaysNumber']);
     }
 
     function initGui() {
@@ -930,7 +925,7 @@
             '.nc-dot-table th,td,tr {cursor:pointer;} ',
             '.nc-dot-table .centered {text-align:center;} ',
             '.nc-dot-table th:hover,tr:hover {background-color:aliceblue; outline: -webkit-focus-ring-color auto 5px;} ',
-            '.nc-dot-table th:hover {color:blue; border-color:whitesmoke; } ',
+            '.nc-dot-table th:hover {color:#00a4eb; border-color:whitesmoke; } ',
             '.nc-dot-table {border:1px solid gray; border-collapse:collapse; width:100%; font-size:83%;margin:0px 0px 0px 0px} ',
             '.nc-dot-table th,td {border:1px solid #dcdcdc;} ',
             '.nc-dot-table td,th {color:black; padding:1px 2px;} ',
@@ -938,14 +933,26 @@
             '.nc-dot-table .table-img {max-width:12px; max-height:12px;} ',
             '.tooltip.top > .tooltip-arrow {border-top-color:white;} ',
             '.tooltip.bottom > .tooltip-arrow {border-bottom-color:white;} ',
-            'a.close-popover {text-decoration:none;padding:0px 3px;border-width:1px;background-color:white;border-color:ghostwhite} a.close-popover:hover {padding:0px 4px;border-style:outset;border-width:1px;background-color:white;border-color:ghostwhite;} ',
+            'a.close-popover {text-decoration:none;padding:0px 10px;border-radius:20px;border-width:0px;background-color:rgb(242, 243, 244);color: rgb(0, 164, 235);} a.close-popover:hover {background-color:rgb(234, 241, 246);} ',
             '#nc-dot-refresh-popup {position:absolute;z-index:9999;top:80px;left:650px;background-color:rgb(120,176,191);e;font-size:120%;padding:3px 11px;box-shadow:6px 8px rgba(20,20,20,0.6);border-radius:5px;color:white;} ',
-            '.refreshIcon:hover {color:blue; text-shadow: 2px 2px #aaa;} .refreshIcon:active{ text-shadow: 0px 0px; }',
+            '.refreshIcon:hover {color:#00a4eb} .refreshIcon:active{ text-shadow: 0px 0px; }',
             '.nc-dot-archived-marker {opacity:0.5;} ',
-            '.nc-dot-table-label {font-size:85%;} .nc-dot-table-action:hover {color:blue;cursor:pointer} .nc-dot-table-label.right {float:right} .nc-dot-table-label.count {margin-left:4px;}',
+            '.nc-dot-table-label {font-size:85%;} .nc-dot-table-action:hover {color:#00a4eb;cursor:pointer} .nc-dot-table-label.right {float:right} .nc-dot-table-label.count {margin-left:4px;}',
             '.nc-dot-popover-cont {display: flex;}',
             '.nc-dot-popover-label {font-weight:bold; width: 115px; display: inline-block;}',
             '.nc-dot-popover-data {flex: 1;}',
+            '.monospace {font-family:monospace !important;}',
+            '.btn-dot { display:inline-block; align-items: center; font-family: Gotham-Rounded, Rubik, sans-serif; font-size: 12px; font-weight: 500;height: 28px;justify-content: center;line-height: 14px;min-width: 48px;text-align: center;user-select: none;white-space: nowrap; border-width: 1px; border-style: solid; border-color: transparent;border-image: initial;border-radius: 20px;outline: none;padding: 0px 16px;}',
+            '.btn-dot-primary { background-color: #00a4eb; color: #fff; }',
+            '.btn-dot-primary:hover { background-color: #0595d3; color: #fff;}',
+            '.btn-dot-primary:focus { background-color: #0985bb; color: #fff;}',
+            '.btn-dot-secondary { background-color: rgb(242, 243, 244); color: rgb(0, 164, 235);padding: 0px 12px;}',
+            '.btn-dot-secondary:hover { background-color: rgb(234, 241, 246);}',
+            '.btn-dot-secondary:focus { background-color: rgb(234, 241, 246); box-sizing: border-box; border-width: 1px; border-style: solid; border-color: rgb(0, 164, 235); border-image: initial;}',
+            '.dot-header {float:left;max-width:430px;color:rgb(0, 164, 235);font-family: Gotham-Rounded, Rubik, sans-serif;font-size:14px; font-weight:400;}',
+            '.camera {max-width: 320px;}',
+            '#tims-id-entry {background-color: #fff; width:70px; margin:2px 5px !important; box-sizing: border-box; color: rgb(32, 33, 36); display: inline-block; font-size: 12px; line-height: 14px;font-family: inherit; border-color: rgb(242, 243, 244); border-radius: 6px;border-width: 0px 0px 1px; margin: 0px; outline: none; transition: border-bottom-left-radius 0.3s cubic-bezier(0.25, 0.1, 0.25, 1) 0s, border-bottom-right-radius 0.3s 0s; padding: 0px 10px;}',
+            '#tims-id-label {font-family: "Rubik", "Helvetica Neue", Helvetica, "Open Sans", sans-serif; font-size: 11px; width: 100%; color: #354148;}'
         ].join('');
         $('<style type="text/css">' + classHtml + '</style>').appendTo('head');
 
