@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME North Carolina DOT Reports
 // @namespace    https://greasyfork.org/users/45389
-// @version      2020.08.21.01
+// @version      2020.08.23.01
 // @description  Display NC transportation department reports in WME.
 // @author       MapOMatic, The_Cre8r, and ABelter
 // @license      GNU GPLv3
@@ -86,7 +86,8 @@
                 hideSRHighwaysReports: $('#settingsHideNCDotSRHighwaysReports').is(':checked'),
                 hideXDaysReports: $('#settingsHideNCDotXDaysReports').is(':checked'),
                 hideXDaysNumber: $('#settingsHideNCDotXDaysNumber').val(),
-                archivedReports:_settings.archivedReports
+                archivedReports:_settings.archivedReports,
+                lastSaved: Date.now()
             };
             localStorage.setItem(STORE_NAME, JSON.stringify(settings));
             WazeWrap.Remote.SaveSettings(STORE_NAME, settings);
@@ -784,6 +785,7 @@
             fetchReports(true);
             e.stopPropagation();
         });
+        $('#closures-sheet-go').click(function(evt) {evt.stopPropagation(); window.open('https://www.wazenc.us/closures','_blank');});
         $('#tims-id-go').click(onTimsIdGoClick);
         $('#tims-id-entry').on('keyup', e => {
             if (e.keyCode == 13) {
@@ -801,24 +803,27 @@
 
     function initUserPanel() {
         _tabDiv.tab = $('<li>').append(
-            $('<a>', {'data-toggle':'tab', href:'#sidepanel-nc-statedot'}).text('NCDOT')
+            $('<a>', {'data-toggle':'tab', href:'#sidepanel-nc-statedot', style:'height:auto;'}).html('<img style="max-width:25px;" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADwAAAAYCAYAAACmwZ5SAAACwUlEQVRYR82YOWhUURSGv3/iLq6oRQgiFiKSKmoQEUGbiEEbca1SWIiIS2ejjQvYaCFiKSgqQQuX4K4ImkIULVQQ7AQXEjWLoOJyjxy5kUckk/dm5k1m4DJ35p17zv/d9dwnKvfZLmmrmX0GvHwCAvAT+A78Ar4CH4D3sXjdnxWAuliSdf9vqGdKSB+qnqR7BfQnDctFPydpc7lO8mpvZkeAvZUAbpJ0DFiel9gK+X1rZg2lAnu70cAPSc+BxgqJysuNL5s6M2vMAjwK2AB0FgqFQ2bm0/cbMDEvlWX6/Q28MLP9wG3Af49PDSypG5gB9AFTyhSTd/M+SSdCCG/iZunxfMB60wC7zW5JR/NWWQX/PcWApwI7JO0BpldBTDVCdCeBxwLbHE7SYqAlnoHVEFKVGGZ2IAncJulUVSKPQBBJ7SGELQ48AWiQdB2YOwJaKhnSzOwe8ExSE7AImCTpdAihzQM5cIek1oxRewBf42k2vYyuK2Lu4LuA48AsoGvAqyS9BBakCPPUzM4Dj4CHMfGoB2YD/u1HlZ/JY+KsmS9pfQq/uZiY2SagfbBzHyEfKU/Qx0XBk4GZEcCf9QJ34mUgkzhJF4F1mRpVwNj3ohCC584+GI8jw1/PeU/JOZI64wyoAEoqFw8kvTOzjW5tZvuAg/+mdCoX5Rn5pWJJnEH1kuYBXnwZ5N3hHWa2Jik/74DFusqXkZ/9qyWdjfVyutbi5uRL08trM1voF5xaAU7qaJV0wZP7Eonvm9nheEko6mIkR3iwsBZJ1zJmd/1mthM4E9+uDNtftQTsYldKupLyytllZst86g5LmTCoNWCXtkLSZc+QioA8MTPP9f3dWaZPLQI7wFJJd+Pm8x+Qma0FrmYijca1CuzymiXdAKYlwczsJrCqFNhqJB6l6hpo11woFE6GEL7EI+cjcAm4VarjP70usQeYszuIAAAAAElFTkSuQmCC" />')
         );
 
         _tabDiv.panel = $('<div>', {class:'tab-pane', id:'sidepanel-nc-statedot'}).append(
             $('<div>', {class:'side-panel-section>'}).append(
-                $('<div>').append(
-                    $('<ul>', {id:'ncdot-tabs', class:'nav nav-tabs'}).append(
-                        $('<li>',{class:'active',style:'text-align: center; height: 30px;'}).append(
-                            $('<a>',{id:'ncdot-tabstitle-closures',style:'height: 30px;',href:'#ncdot-tabs-closures','data-toggle':'tab'}).text('Closures'))
+                //$('<div>').append(
+                //    $('<ul>', {id:'ncdot-tabs', class:'nav nav-tabs'}).append(
+                //        $('<li>',{class:'active',style:'text-align: center; height: 30px;'}).append(
+                //            $('<a>',{id:'ncdot-tabstitle-closures',style:'height: 30px;',href:'#ncdot-tabs-closures','data-toggle':'tab'}).text('Closures'))
                         //).append(
                         //$('<li>',{style:'text-align: center; height: 30px;'}).append(
                         //    $('<a>',{id:'ncdot-tabstitle-cleared',style:'height: 30px;',href:'#ncdot-tabs-cleared','data-toggle':'tab'}).text('Cleared'))
-                        )
-                    ),
+                //        )
+                //    ),
                 $('<div>', {style:'width: 100%; text-align:center;'}).append(
                     $('<span>', {id:'tims-id-label'}).text('Jump to Incident:'),
                     $('<input>', {id:'tims-id-entry', type:'text', placeholder:'TIMS ID'}),
                     $('<button>', {id:'tims-id-go', class:'btn-dot btn-dot-primary'}).text('Go')
+                ),
+                $('<div>', {style:'width: 100%; text-align:center; padding-top:3px;'}).append(
+                    $('<button>', {id:'closures-sheet-go', class:'btn-dot btn-dot-primary'}).text('Open NC Closures Sheet')
                 ),
                 $('<div>',{id:'ncdot-tab-content',class:'tab-content'}).append(
                     $('<section>',{id:'ncdot-tabs-closures',class:'tab-pane active'}).append(
