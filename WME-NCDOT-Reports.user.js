@@ -662,7 +662,7 @@
         let detailsUrl = 'https://drivenc.gov/default.aspx?type=incident&id=';
 		let adminUrl = 'https://tims.ncdot.gov/tims/V2/Incident/Details/';
 		let TIMSadmin = $('#secureSite').is(':checked');
-        
+
         let eventLookup = {1:"None", 138:"Hurricane Matthew"};
         let content = [];
         content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Road:</div><div class="nc-dot-popover-data">' + removeNull(attr.RoadFullName) + '</div></div>');
@@ -688,7 +688,7 @@
 			content.push('<hr style="margin:5px 0px; border-color:#dcdcdc"><div style="display:table;width:100%"><button type="button" class="btn-dot btn-dot-primary btn-open-dot-report" data-dot-report-url="' + detailsUrl + report.id + '" style="float:left;">DriveNC.gov <span class="fa fa-external-link" /></button><button type="button" title="Copy DriveNC URL to clipboard" class="btn-dot btn-dot-secondary btn-copy-report-url" data-dot-reporturl="' + detailsUrl + report.id + '" style="float:left;margin-left:6px;"><span class="fa fa-copy" /> URL</button>');
 		}
         content.push('<button type="button" style="float:right;" class="btn-dot btn-dot-primary btn-archive-dot-report" data-dot-report-id="' + report.id + '">Archive</button></div>');
-        
+
 		if (_user === 'abelter') {
             content.push('<div style="display:table;width:100%;margin-top:5px;"><button type="button" id="pushlocated" title="Push to NC Closures Sheet as Located" class="btn-dot btn-dot-secondary btn-push-to-sheet" data-dot-reportid="' + report.id + '" data-dot-status="Located"style="margin-right:6px;"><span class="" />Post to Sheet - Located</button>');
             if (_rank >= 3) {
@@ -1247,6 +1247,7 @@
             '#tims-id-label {font-family: "Rubik", "Helvetica Neue", Helvetica, "Open Sans", sans-serif; font-size: 11px; width: 100%; color: #354148;}',
             '#sidepanel-ncdot .tab-pane { padding: 1px !important; }',
             '#ncdot-tab-content { padding: 1px !important; }',
+            '#ncdot-tab-content .controls-container > label { word-break: break-word; white-space: normal !important; }',
             '.layer-switcher ul[class^="collapsible"] { max-height: none; }'
         ].join('');
         $('<style type="text/css">' + classHtml + '</style>').appendTo('head');
