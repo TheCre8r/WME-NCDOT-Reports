@@ -1230,7 +1230,8 @@
             '#tims-id-entry {background-color: rgb(242, 243, 244); width:70px; margin:2px 5px !important; box-sizing: border-box; color: rgb(32, 33, 36); display: inline-block; font-size: 12px; line-height: 14px;font-family: inherit; border-radius: 6px;border-width: 0px; margin: 0px; outline: none; transition: border-bottom-left-radius 0.3s cubic-bezier(0.25, 0.1, 0.25, 1) 0s, border-bottom-right-radius 0.3s 0s; padding: 0px 10px;}',
             '#tims-id-label {font-family: "Rubik", "Helvetica Neue", Helvetica, "Open Sans", sans-serif; font-size: 11px; width: 100%; color: #354148;}',
             '#sidepanel-ncdot .tab-pane { padding: 1px !important; }',
-            '#ncdot-tab-content { padding: 1px !important; }'
+            '#ncdot-tab-content { padding: 1px !important; }',
+            '.layer-switcher ul[class^="collapsible"] { max-height: none; }'
         ].join('');
         $('<style type="text/css">' + classHtml + '</style>').appendTo('head');
 
