@@ -35,6 +35,20 @@ v 2020.06.07
 - Formatting changes to Incident Pop-up: Moved RTC description and copy button, added DriveNC copy URL button
 - Converted 24:00 times to 00:00
 
+v 2020.11.23
+- Fixed camera source; added image refresh functionality
+- Fixed 24:00 times to 00:00
+- Fixed "Hide All but Weather Events" filter option
+- Fixed automatic un-archive if TIMS incident updated
+- Added additional filters: Hide Interstates, Hide US Highways, Hide NC Highways, Hide NC Secondary Routes, Hide All but Incidents Updated in the last x days
+- Added option to show City and County in description column; when enabled, this column becomes sortable by City name
+- Added Closure Date/Time info from DriveNC when available (e.g. daily/nightly closure details)
+- Table sorting: Changed default sort to show most recent updates first; sorting is now reversible
+- Added WazeWrap settings sync and alerts (including alerts history)
+- Fresh coat of paint: Updated icons, buttons, colors
+- Reports and Cameras are now native WME layers that can be turned on/off
+- New settings: Copy PL when archiving report, Copy Description when opening report, Auto open closures tab when selecting segments (keyboard shortcut available)
+
 ## Installation
 
 Install just like any other userscript by clicking this link:
@@ -44,7 +58,7 @@ https://github.com/TheCre8r/WME-NCDOT-Reports/raw/master/WME-NCDOT-Reports.user.
 
 * **Mapomatic** - *Initial work and feature requests*
 * **The_Cre8r** - *Compatibility updates*
-* **ABelter** - *Compatibility updates*
+* **ABelter** - *Compatibility updates and new features*
 
 ## License
 
