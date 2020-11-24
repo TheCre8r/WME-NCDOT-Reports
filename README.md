@@ -27,6 +27,7 @@ v 2020.04.27
 - Updated incident links and descriptions to DriveNC.gov
 - Fixed camera image sizes + added link to view full-size
 
+
 v 2020.06.07
 - Added option to show City and County in description column; when enabled, this column becomes sortable by City name
 - Added Closure Date/Time info from DriveNC API
@@ -58,7 +59,9 @@ https://github.com/TheCre8r/WME-NCDOT-Reports/raw/master/WME-NCDOT-Reports.user.
 
 * **Mapomatic** - *Initial work and feature requests*
 * **The_Cre8r** - *Compatibility updates*
+
 * **ABelter** - *Compatibility updates and new features*
+
 
 ## License
 
