@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME NCDOT Reports
 // @namespace    https://greasyfork.org/users/45389
-// @version      2020.11.23.01
+// @version      2020.11.24.01
 // @description  Display NC transportation department reports in WME.
 // @author       MapOMatic, The_Cre8r, and ABelter
 // @license      GNU GPLv3
@@ -98,6 +98,7 @@
                 hideSRHighwaysReports: $('#settingsHideNCDotSRHighwaysReports').is(':checked'),
                 hideXDaysReports: $('#settingsHideNCDotXDaysReports').is(':checked'),
                 hideXDaysNumber: $('#settingsHideNCDotXDaysNumber').val(),
+                secureSite: $('#secureSite').is(':checked'),
                 archivedReports:_settings.archivedReports,
                 lastSaved: currentTime
             };
@@ -659,6 +660,9 @@
         _mapLayer.addMarker(marker);
 
         let detailsUrl = 'https://drivenc.gov/default.aspx?type=incident&id=';
+		let adminUrl = 'https://tims.ncdot.gov/tims/V2/Incident/Details/';
+		let TIMSadmin = $('#secureSite').is(':checked');
+
         let eventLookup = {1:"None", 138:"Hurricane Matthew"};
         let content = [];
         content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Road:</div><div class="nc-dot-popover-data">' + removeNull(attr.RoadFullName) + '</div></div>');
@@ -678,9 +682,14 @@
         content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Last Updated:</div><div class="nc-dot-popover-data monospace">' + formatDateTimeString(attr.LastUpdate) + '</div></div>');
         content.push('<hr style="margin:4px 0px; border-color:#dcdcdc">');
         content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label" style="padding-top: 6px;">RTC Description:</div><div class="nc-dot-popover-data">' + removeNull(attr.IncidentType).replace('Night Time','Nighttime') + ' - DriveNC.gov ' + report.id + '&nbsp;&nbsp;<button type="button" title="Copy short description to clipboard" class="btn-dot btn-dot-secondary btn-copy-description" data-dot-reportid="' + report.id + '" style="margin-left:6px;"><span class="fa fa-copy" /></button></div></div>');
-        content.push('<hr style="margin:5px 0px; border-color:#dcdcdc"><div style="display:table;width:100%"><button type="button" class="btn-dot btn-dot-primary btn-open-dot-report" data-dot-report-url="' + detailsUrl + report.id + '" style="float:left;">DriveNC.gov <span class="fa fa-external-link" /></button><button type="button" title="Copy DriveNC URL to clipboard" class="btn-dot btn-dot-secondary btn-copy-report-url" data-dot-reporturl="' + detailsUrl + report.id + '" style="float:left;margin-left:6px;"><span class="fa fa-copy" /> URL</button>');
+        if (TIMSadmin) {
+			content.push('<hr style="margin:5px 0px; border-color:#dcdcdc"><div style="display:table;width:100%"><button type="button" class="btn-dot btn-dot-primary btn-open-dot-report" data-dot-report-url="' + adminUrl + report.id + '" style="float:left;">TIMS Admin <span class="fa fa-external-link" /></button><button type="button" title="Copy TIMS Admin URL to clipboard" class="btn-dot btn-dot-secondary btn-copy-report-url" data-dot-reporturl="' + adminUrl + report.id + '" style="float:left;margin-left:6px;"><span class="fa fa-copy" /> URL</button>');
+        } else {
+			content.push('<hr style="margin:5px 0px; border-color:#dcdcdc"><div style="display:table;width:100%"><button type="button" class="btn-dot btn-dot-primary btn-open-dot-report" data-dot-report-url="' + detailsUrl + report.id + '" style="float:left;">DriveNC.gov <span class="fa fa-external-link" /></button><button type="button" title="Copy DriveNC URL to clipboard" class="btn-dot btn-dot-secondary btn-copy-report-url" data-dot-reporturl="' + detailsUrl + report.id + '" style="float:left;margin-left:6px;"><span class="fa fa-copy" /> URL</button>');
+		}
         content.push('<button type="button" style="float:right;" class="btn-dot btn-dot-primary btn-archive-dot-report" data-dot-report-id="' + report.id + '">Archive</button></div>');
-        if (_user === 'abelter') {
+
+		if (_user === 'abelter') {
             content.push('<div style="display:table;width:100%;margin-top:5px;"><button type="button" id="pushlocated" title="Push to NC Closures Sheet as Located" class="btn-dot btn-dot-secondary btn-push-to-sheet" data-dot-reportid="' + report.id + '" data-dot-status="Located"style="margin-right:6px;"><span class="" />Post to Sheet - Located</button>');
             if (_rank >= 3) {
                 content.push('<button type="button" title="Push to NC Closures Sheet as Closed" class="btn-dot btn-dot-secondary btn-push-to-sheet" data-dot-reportid="' + report.id + '" data-dot-status="Closed"><span class="" />Post to Sheet - Closed</button>');
@@ -1166,7 +1175,14 @@
                         $('<button type="button" class="btn-dot btn-dot-primary" style="">Copy Active IDs to clipboard</button>').click(function() {
                             copyIncidentIDsToClipboard();
                             WazeWrap.Alerts.success(SCRIPT_NAME, 'IDs have been copied to the clipboard.');
-                        })
+                        }),
+                    $('<div>',{class:'controls-container'})
+                    .append($('<input>', {type:'checkbox',name:'secureSite',id:'secureSite'}).change(function(){
+                        saveSettingsToStorage();
+                        hideAllReportPopovers();
+                        fetchReports(true);
+                    }))
+                    .append($('<label>', {for:'secureSite'}).text('Use TIMS Admin site instead of DriveNC'))
                     )
                 )
             )
@@ -1184,8 +1200,8 @@
                 if (_settings[settingProps[i]]) { $('#' + checkboxIds[i]).attr('checked', 'checked'); }
             }
             $('#settingsHideNCDotXDaysNumber').attr('value', _settings.hideXDaysNumber)
-        })(['showCityCountyCheck','hideLocated','hideJump','copyPL','copyDescription','autoOpenClosures','hideArchivedReports','hideAllButWeatherReports','hideInterstatesReports','hideUSHighwaysReports','hideNCHighwaysReports','hideSRHighwaysReports','hideXDaysReports','hideXDaysNumber'],
-           ['settingsShowCityCounty','settingsHideLocated','settingsHideJump','settingsCopyPL','settingsCopyDescription','settingsAutoOpenClosures','settingsHideNCDotArchivedReports','settingsHideNCDotAllButWeatherReports','settingsHideNCDotInterstatesReports','settingsHideNCDotUSHighwaysReports','settingsHideNCDotNCHighwaysReports','settingsHideNCDotSRHighwaysReports','settingsHideNCDotXDaysReports','settingsHideNCDotXDaysNumber']);
+        })(['showCityCountyCheck','hideLocated','hideJump','copyPL','copyDescription','autoOpenClosures','hideArchivedReports','hideAllButWeatherReports', 'secureSite','hideInterstatesReports','hideUSHighwaysReports','hideNCHighwaysReports','hideSRHighwaysReports','hideXDaysReports','hideXDaysNumber'],
+           ['settingsShowCityCounty','settingsHideLocated','settingsHideJump','settingsCopyPL','settingsCopyDescription','settingsAutoOpenClosures','settingsHideNCDotArchivedReports','settingsHideNCDotAllButWeatherReports', 'secureSite','settingsHideNCDotInterstatesReports','settingsHideNCDotUSHighwaysReports','settingsHideNCDotNCHighwaysReports','settingsHideNCDotSRHighwaysReports','settingsHideNCDotXDaysReports','settingsHideNCDotXDaysNumber']);
     }
 
     function initGui() {
@@ -1231,6 +1247,7 @@
             '#tims-id-label {font-family: "Rubik", "Helvetica Neue", Helvetica, "Open Sans", sans-serif; font-size: 11px; width: 100%; color: #354148;}',
             '#sidepanel-ncdot .tab-pane { padding: 1px !important; }',
             '#ncdot-tab-content { padding: 1px !important; }',
+            '#ncdot-tab-content .controls-container > label { word-break: break-word; white-space: normal !important; }',
             '.layer-switcher ul[class^="collapsible"] { max-height: none; }'
         ].join('');
         $('<style type="text/css">' + classHtml + '</style>').appendTo('head');
@@ -1270,6 +1287,7 @@
                 hideSRHighwaysReports:false,
                 hideXDaysReports:false,
                 hideXDaysNumber:7,
+				secureSite:false,
                 archivedReports:{},
                 lastSaved: 0
             };
