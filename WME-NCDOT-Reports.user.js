@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME NCDOT Reports
 // @namespace    https://greasyfork.org/users/45389
-// @version      2020.11.24.01
+// @version      2021.02.26.01
 // @description  Display NC transportation department reports in WME.
 // @author       MapOMatic, The_Cre8r, and ABelter
 // @license      GNU GPLv3
@@ -15,10 +15,7 @@
 
 /* global $ */
 /* global OpenLayers */
-/* global GM_info */
 /* global W */
-/* global GM_xmlhttpRequest */
-/* global unsafeWindow */
 /* global Components */
 /* global I18n */
 /* global WazeWrap */
@@ -1308,7 +1305,6 @@
         WazeWrap.Interface.ShowScriptUpdate(SCRIPT_NAME, SCRIPT_VERSION, SCRIPT_CHANGES,`" </a><a target="_blank" href='https://github.com/TheCre8r/WME-NCDOT-Reports'>GitHub</a><a style="display:none;" href="`,'');
         initGui();
         _window.addEventListener('beforeunload', function saveOnClose() { saveSettingsToStorage(); }, false);
-        W.app.modeController.model.bind('change:mode', onModeChanged);
         log('Initialized.');
 
         WazeWrap.Events.register('selectionchanged', null, openClosuresTab);
