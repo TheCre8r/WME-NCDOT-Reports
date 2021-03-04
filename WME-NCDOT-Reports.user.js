@@ -229,7 +229,7 @@
         let openDate = formatDateString(getReport(id).attributes.End);
         let openTime = formatTimeString(getReport(id).attributes.End);
         let closureReason = getReport(id).attributes.IncidentType + ' - ' + getReport(id).attributes.Reason;
-        let timsURL = 'https://drivenc.gov/default.aspx?type=incident&id=' + id;
+        let timsURL = 'https://drivenc.gov/?type=incident&id=' + id;
         let closureDirection = getReport(id).attributes.Direction;
         let permalink = document.querySelector(".WazeControlPermalink .permalink").href;
         permalink = permalink.replace(/(&s=[0-9]{6,14}&)/,'&');
@@ -656,7 +656,7 @@
         //marker.events.register('click', marker, onMarkerClick);
         _mapLayer.addMarker(marker);
 
-        let detailsUrl = 'https://drivenc.gov/default.aspx?type=incident&id=';
+        let detailsUrl = 'https://drivenc.gov/?type=incident&id=';
 		let adminUrl = 'https://tims.ncdot.gov/tims/V2/Incident/Details/';
 		let TIMSadmin = $('#secureSite').is(':checked');
 
