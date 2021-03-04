@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME NCDOT Reports
 // @namespace    https://greasyfork.org/users/45389
-// @version      2021.02.26.01
+// @version      2021.03.03.01
 // @description  Display NC transportation department reports in WME.
 // @author       MapOMatic, The_Cre8r, and ABelter
 // @license      GNU GPLv3
@@ -33,18 +33,7 @@
     const UPDATE_ALERT = true;
     const SCRIPT_CHANGES = [
         '<ul>',
-        '<li>Fixed camera source; added image refresh functionality</li>',
-        '<li>Fixed 24:00 times to 00:00</li>',
-        '<li>Fixed "Hide All but Weather Events" filter option</li>',
-        '<li>Fixed automatic un-archive if TIMS incident updated</li>',
-        '<li>Added additional filters: Hide Interstates, Hide US Highways, Hide NC Highways, Hide NC Secondary Routes, Hide All but Incidents Updated in the last x days</li>',
-        '<li>Added option to show City and County in description column; when enabled, this column becomes sortable by City name</li>',
-        '<li>Added Closure Date/Time info from DriveNC when available (e.g. daily/nightly closure details)</li>',
-        '<li>Table sorting: Changed default sort to show most recent updates first; sorting is now reversible</li>',
-        '<li>Added WazeWrap settings sync and alerts (including alerts history)</li>',
-        '<li>Fresh coat of paint: Updated icons, buttons, colors</li>',
-        '<li>Reports and Cameras are now native WME layers that can be turned on/off</li>',
-        '<li>New settings: Copy PL when archiving report, Copy Description when opening report, Auto open closures tab when selecting segments (keyboard shortcut available)</li>',
+        '<li>Fixed DriveNC URLs</li>',
         '</ul>'
     ].join('\n');
 
