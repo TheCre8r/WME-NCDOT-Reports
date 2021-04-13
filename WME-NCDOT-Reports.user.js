@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME NCDOT Reports
 // @namespace    https://greasyfork.org/users/45389
-// @version      2021.03.03.01
+// @version      2021.04.12.01
 // @description  Display NC transportation department reports in WME.
 // @author       MapOMatic, The_Cre8r, and ABelter
 // @license      GNU GPLv3
@@ -33,7 +33,7 @@
     const UPDATE_ALERT = true;
     const SCRIPT_CHANGES = [
         '<ul>',
-        '<li>Fixed DriveNC URLs</li>',
+        '<li>Minor Code Clean-up</li>',
         '</ul>'
     ].join('\n');
 
@@ -1062,7 +1062,7 @@
                     $('<a>',{id:'ncdot-tabstitle-settings',href:'#ncdot-tabs-settings','data-toggle':'tab'}).text('Settings')
                 ),
                 $('<li>').append(
-                    $('<a>',{id:'ncdot-tabstitle-sm',style:'dislay:none',href:'#ncdot-tabs-sm','data-toggle':'tab'}).text('SMs')
+                    $('<a>',{id:'ncdot-tabstitle-sm',style:'display:none',href:'#ncdot-tabs-sm','data-toggle':'tab'}).text('SMs')
                 )
             ),
             $('<div>',{id:'ncdot-tab-content',class:'tab-content'}).append(
@@ -1140,7 +1140,7 @@
                     $('<div>',{class:'controls-container'})
                     .append($('<input>', {type:'checkbox',name:'settingsShowCityCounty',id:'settingsShowCityCounty'}))
                     .append($('<label>', {for:'settingsShowCityCounty'}).text('Show City and County in Description Column')),
-                    $('<div>',{class:'controls-container hide-located-setting',style:'dislay:none'})
+                    $('<div>',{class:'controls-container hide-located-setting',style:'display:none'})
                     .append($('<input>', {type:'checkbox',name:'settingsHideLocated',id:'settingsHideLocated'}))
                     .append($('<label>', {for:'settingsHideLocated'}).text('Hide "Post to Sheet - Located" Button')),
                     $('<div>',{class:'controls-container'})
