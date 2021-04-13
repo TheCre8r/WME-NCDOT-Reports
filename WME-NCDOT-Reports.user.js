@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME NCDOT Reports
 // @namespace    https://greasyfork.org/users/45389
-// @version      2021.04.12.01
+// @version      2021.04.12.02
 // @description  Display NC transportation department reports in WME.
 // @author       MapOMatic, The_Cre8r, and ABelter
 // @license      GNU GPLv3
@@ -24,7 +24,7 @@
     'use strict';
 
     const REPORTS_URL = 'https://tims.ncdot.gov/tims/api/incidents/verbose';
-    const CAMERAS_URL = 'https://services.arcgis.com/NuWFvHYDMVmmxMeM/ArcGIS/rest/services/NCDOT_TIMSCameras/FeatureServer/0/query?where=Latitude+%3E+0&objectIds=&time=&geometry=&geometryType=esriGeometryPoint&inSR=&spatialRel=esriSpatialRelIntersects&resultType=none&distance=0.0&units=esriSRUnit_Meter&returnGeodetic=false&outFields=*&returnGeometry=true&featureEncoding=esriDefault&multipatchOption=xyFootprint&maxAllowableOffset=&geometryPrecision=&outSR=&datumTransformation=&applyVCSProjection=false&returnIdsOnly=false&returnUniqueIdsOnly=false&returnCountOnly=false&returnExtentOnly=false&returnQueryGeometry=false&returnDistinctValues=false&cacheHint=false&orderByFields=&groupByFieldsForStatistics=&outStatistics=&having=&resultOffset=&resultRecordCount=&returnZ=false&returnM=false&returnExceededLimitFeatures=true&quantizationParameters=&sqlFormat=none&f=pjson&token='
+    const CAMERAS_URL = 'https://tims.ncdot.gov/tims/api/traffic/cameras/'
 
     let _window = unsafeWindow ? unsafeWindow : window;
     const STORE_NAME = "nc_dot_report_settings";
@@ -33,7 +33,7 @@
     const UPDATE_ALERT = true;
     const SCRIPT_CHANGES = [
         '<ul>',
-        '<li>Minor Code Clean-up</li>',
+            '<li>Changed camera source to new API which shows more cameras!</li>',
         '</ul>'
     ].join('\n');
 
@@ -821,85 +821,94 @@
         });
     }
 
+    function fetchCameraByID(id){
+        return $.getJSON(`https://tims.ncdot.gov/tims/api/traffic/cameras/`+id).then(function(data){
+            return data;
+        });
+    }
+
+
     function fetchCameras() {
         GM_xmlhttpRequest({
             method: 'GET',
             url: CAMERAS_URL,
             onload: function(res) {
-                let features = $.parseJSON(res.responseText).features;
+                let features = $.parseJSON(res.responseText);
+                console.log(features)
                 features.forEach(function(report) {
-                    let size = new OpenLayers.Size(32,32);
-                    let offset = new OpenLayers.Pixel(-(size.w/2), -size.h);
-                    let now = new Date(Date.now());
-                    let imgName = 'camera.png';
-                    let attr = report.attributes;
+                    fetchCameraByID(report.id).then(function(returndata){
+                        let cameraDetails = returndata
+                        let size = new OpenLayers.Size(32,32);
+                        let offset = new OpenLayers.Pixel(-(size.w/2), -size.h);
+                        let now = new Date(Date.now());
+                        let imgName = 'camera.png';
+                        report.imgUrl = _imagesPath + imgName;
+                        let icon = new OpenLayers.Icon(report.imgUrl,size,null);
+                        let marker = new OpenLayers.Marker(
+                            new OpenLayers.LonLat(report.longitude,report.latitude).transform(
+                                new OpenLayers.Projection("EPSG:4326"),
+                                W.map.getProjectionObject()
+                            ),
+                            icon
+                        );
 
-                    report.imgUrl = _imagesPath + imgName;
-                    let icon = new OpenLayers.Icon(report.imgUrl,size,null);
-                    let marker = new OpenLayers.Marker(
-                        new OpenLayers.LonLat(attr.Longitude,attr.Latitude).transform(
-                            new OpenLayers.Projection("EPSG:4326"),
-                            W.map.getProjectionObject()
-                        ),
-                        icon
-                    );
+                        let popoverTemplate = ['<div class="reportPopover popover" style="max-width:450px;width:385px;min-height:280px;">',
+                                               '<div class="arrow"></div>',
+                                               '<div class="popover-title"></div>',
+                                               '<div class="popover-content">',
+                                               '</div>',
+                                               '</div>'].join('');
+                        marker.report = report;
+                        _cameraLayer.addMarker(marker);
 
-                    let popoverTemplate = ['<div class="reportPopover popover" style="max-width:450px;width:385px;min-height:280px;">',
-                                           '<div class="arrow"></div>',
-                                           '<div class="popover-title"></div>',
-                                           '<div class="popover-content">',
-                                           '</div>',
-                                           '</div>'].join('');
-                    marker.report = report;
-                    _cameraLayer.addMarker(marker);
-
-                    let re=/window.open\('(.*?)'/;
-                    let cameraImgUrl = attr.Link;
-					let cameraContent = [];
-					cameraContent.push('<img id="camera-img-'+ attr.OBJECTID +'" src=' + cameraImgUrl + '&t=' + new Date().getTime() + ' style="max-width:352px">');
-					cameraContent.push('<div><hr style="margin:5px 0px;border-color:#dcdcdc"><div style="display:table;width:100%"><button type="button" class="btn-dot btn-dot-primary btn-open-camera-img" data-camera-img-url="' + cameraImgUrl + '" style="float:left;">Open Image Full-Size</button><button type="button" class="btn-dot btn-dot-primary btn-refresh-camera-img" data-camera-img-url="' + cameraImgUrl + '" style="float:right;"><span class="fa fa-refresh" /></button></div></div>');
-                    let $imageDiv = $(marker.icon.imageDiv)
-                    .css('cursor', 'pointer')
-                    .addClass('ncDotReport')
-                    .attr({
-                        'data-toggle':'popover',
-                        title:'',
-                        'data-content':cameraContent.join(''),
-                        'data-original-title':'<div style"width:100%;"><div class="dot-header camera">' + attr.Location + '</div><div style="float:right;"><a class="close-popover" href="javascript:void(0);">X</a></div><div style="clear:both;"</div></div>'
-                    })
-                    .data('cameraId', attr.OBJECTID)
-                    .popover({trigger: 'manual', html:true,placement: 'top', template:popoverTemplate})
-                    .on('click', function(evt) {
-                        //let $div = $(this);
-                       // let camera = getCamera($div.data('cameraId'));
-                        evt.stopPropagation();
-                        let $div = $(this);
-                        hideAllPopovers($div);
-                        if ($div.data('state') !== 'pinned') {
-                            let id = $div.data('cameraId');
-                            $div.data('state', 'pinned');
-                            //W.map.moveTo(report.marker.lonlat);
-                            $div.popover('show');
-                            document.getElementById('camera-img-'+id).src = cameraImgUrl + "&t=" + new Date().getTime(); //by default the images are loaded on page load, this line loads the latest image when the pop-up is opened
-							$('.btn-open-camera-img').click(function(evt) {evt.stopPropagation(); window.open($(this).data('cameraImgUrl'),'_blank');});
-							$('.btn-refresh-camera-img').click(function(evt) {evt.stopPropagation(); document.getElementById('camera-img-'+id).src = $(this).data('cameraImgUrl') + "&t=" + new Date().getTime();});
-                            $('.reportPopover,.close-popover').click(function(evt) {
+                        let re=/window.open\('(.*?)'/;
+                        let cameraImgUrl = cameraDetails.imageURL;
+                        let cameraContent = [];
+                        cameraContent.push('<img id="camera-img-'+ report.id +'" src=' + cameraImgUrl + '&t=' + new Date().getTime() + ' style="max-width:352px">');
+                        cameraContent.push('<div><hr style="margin:5px 0px;border-color:#dcdcdc"><div style="display:table;width:100%"><button type="button" class="btn-dot btn-dot-primary btn-open-camera-img" data-camera-img-url="' + cameraImgUrl + '" style="float:left;">Open Image Full-Size</button><button type="button" class="btn-dot btn-dot-primary btn-refresh-camera-img" data-camera-img-url="' + cameraImgUrl + '" style="float:right;"><span class="fa fa-refresh" /></button></div></div>');
+                        let $imageDiv = $(marker.icon.imageDiv)
+                        .css('cursor', 'pointer')
+                        .addClass('ncDotReport')
+                        .attr({
+                            'data-toggle':'popover',
+                            title:'',
+                            'data-content':cameraContent.join(''),
+                            'data-original-title':'<div style"width:100%;"><div class="dot-header camera">' + cameraDetails.locationName + '</div><div style="float:right;"><a class="close-popover" href="javascript:void(0);">X</a></div><div style="clear:both;"</div></div>'
+                        })
+                        .data('cameraId', report.id)
+                        .popover({trigger: 'manual', html:true,placement: 'top', template:popoverTemplate})
+                        .on('click', function(evt) {
+                            //let $div = $(this);
+                            // let camera = getCamera($div.data('cameraId'));
+                            evt.stopPropagation();
+                            let $div = $(this);
+                            hideAllPopovers($div);
+                            if ($div.data('state') !== 'pinned') {
+                                let id = $div.data('cameraId');
+                                $div.data('state', 'pinned');
+                                //W.map.moveTo(report.marker.lonlat);
+                                $div.popover('show');
+                                document.getElementById('camera-img-'+id).src = cameraImgUrl + "&t=" + new Date().getTime(); //by default the images are loaded on page load, this line loads the latest image when the pop-up is opened
+                                $('.btn-open-camera-img').click(function(evt) {evt.stopPropagation(); window.open($(this).data('cameraImgUrl'),'_blank');});
+                                $('.btn-refresh-camera-img').click(function(evt) {evt.stopPropagation(); document.getElementById('camera-img-'+id).src = $(this).data('cameraImgUrl') + "&t=" + new Date().getTime();});
+                                $('.reportPopover,.close-popover').click(function(evt) {
+                                    $div.data('state', '');
+                                    $div.popover('hide');
+                                });
+                                //$(".close-popover").click(function() {hideAllReportPopovers();});
+                            } else {
                                 $div.data('state', '');
                                 $div.popover('hide');
-                            });
-                            //$(".close-popover").click(function() {hideAllReportPopovers();});
-                        } else {
-                            $div.data('state', '');
-                            $div.popover('hide');
-                        }
-                    })
-                    .data('cameraId', attr.OBJECTID)
-                    .data('state', '');
+                            }
+                        })
+                        .data('cameraId', report.id)
+                        .data('state', '');
 
-                    $imageDiv.data('report', report);
-                    report.imageDiv = $imageDiv;
-                    report.marker = marker;
-                    _cameras.push(report);
+                        $imageDiv.data('report', report);
+                        report.imageDiv = $imageDiv;
+                        report.marker = marker;
+                        _cameras.push(report);
+                    });
                 });
             }
         });
