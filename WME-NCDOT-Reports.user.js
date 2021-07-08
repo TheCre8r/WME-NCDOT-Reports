@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME NCDOT Reports
 // @namespace    https://greasyfork.org/users/45389
-// @version      2021.04.12.02
+// @version      2021.07.08.01
 // @description  Display NC transportation department reports in WME.
 // @author       MapOMatic, The_Cre8r, and ABelter
 // @license      GNU GPLv3
@@ -33,7 +33,7 @@
     const UPDATE_ALERT = true;
     const SCRIPT_CHANGES = [
         '<ul>',
-            '<li>Changed camera source to new API which shows more cameras!</li>',
+            '<li>Added <b>Ferry Closed</b> to the list that is imported.</li>',
         '</ul>'
     ].join('\n');
 
@@ -752,6 +752,7 @@
         let conditionFilter = [
             'Permanent Road Closure',
             'Ramp Closed',
+            'Ferry Closed',
             'Rest Area Closed',
             'Road Closed',
             'Road Closed with Detour',
