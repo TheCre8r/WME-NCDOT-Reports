@@ -50,6 +50,13 @@ v 2020.11.23
 - Reports and Cameras are now native WME layers that can be turned on/off
 - New settings: Copy PL when archiving report, Copy Description when opening report, Auto open closures tab when selecting segments (keyboard shortcut available)
 
+v 2021.07.08
+- Added "Ferry Closed" NCDOT incident type
+
+v 2021.11.06
+- Added "Local Traffic Only" NCDOT incident type
+
+
 ## Installation
 
 Install just like any other userscript by clicking this link:
