@@ -56,6 +56,8 @@ v 2021.07.08
 v 2021.11.06
 - Added "Local Traffic Only" NCDOT incident type
 
+v 2022.02.04
+- Compatability with the new NCDOT API
 
 ## Installation
 
