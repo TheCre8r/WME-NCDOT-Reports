@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME NCDOT Reports
 // @namespace    https://greasyfork.org/users/45389
-// @version      2022.02.04.01
+// @version      2022.02.04.02
 // @description  Display NC transportation department reports in WME.
 // @author       MapOMatic, The_Cre8r, and ABelter
 // @license      GNU GPLv3
@@ -206,13 +206,13 @@
     function copyIncidentIDsToClipboard() {
         let ids = [];
         _reportsClosures.forEach(function(report) {
-            ids.push(report.attributes.Id);
+            ids.push(report.attributes.id);
         });
         return copyToClipboard(ids.join('\n'));
     }
 
     function sendToSheet(id,status) {
-        let roadName = getReport(id).attributes.RoadFullName;
+        let roadName = getReport(id).attributes.roadFullName;
         let closeDate = formatDateString(getReport(id).attributes.start);
         let closeTime = formatTimeString(getReport(id).attributes.start);
         let openDate = formatDateString(getReport(id).attributes.end);
@@ -346,12 +346,12 @@
         _reportsClosures.forEach(function(report) {
             let hide =
                 hideArchived && report.archived ||
-                hideAllButWeather && report.attributes.IncidentType !== 'Weather Event' ||
-                hideInterstates && report.attributes.Road.substring(0,2) == 'I-' ||
-                hideUSHighways && report.attributes.Road.substring(0,3) == 'US-' ||
-                hideNCHighways && report.attributes.Road.substring(0,3) == 'NC-' ||
-                hideSRHighways && report.attributes.Road.substring(0,3) == 'SR-' ||
-                hideXDays && Date.parse(report.attributes.LastUpdate) < Date.parse(xDaysDate);
+                hideAllButWeather && report.attributes.incidentType !== 'Weather Event' ||
+                hideInterstates && report.attributes.road.substring(0,2) == 'I-' ||
+                hideUSHighways && report.attributes.road.substring(0,3) == 'US-' ||
+                hideNCHighways && report.attributes.road.substring(0,3) == 'NC-' ||
+                hideSRHighways && report.attributes.road.substring(0,3) == 'SR-' ||
+                hideXDays && Date.parse(report.attributes.lastUpdate) < Date.parse(xDaysDate);
             if (hide) {
                 report.dataRow.hide();
                 if (report.imageDiv) { report.imageDiv.hide(); }
@@ -413,7 +413,7 @@
 
             let copyRTCDescription = $('#settingsCopyDescription').is(':checked');
             if (copyRTCDescription) {
-                copyToClipboard(getReport(id).attributes.IncidentType.replace('Night Time','Nighttime') + ' - DriveNC.gov ' + id);
+                copyToClipboard(getReport(id).attributes.incidentType.replace('Night Time','Nighttime') + ' - DriveNC.gov ' + id);
                 WazeWrap.Alerts.success(SCRIPT_NAME,"RTC Description copied to clipboard.");
             }
 
@@ -423,12 +423,12 @@
             $('.btn-copy-description').click(function(evt) {
                 evt.stopPropagation();
                 let id = $(this).data('dotReportid');
-                copyToClipboard(getReport(id).attributes.IncidentType.replace('Night Time','Nighttime') + ' - DriveNC.gov ' + id);
+                copyToClipboard(getReport(id).attributes.incidentType.replace('Night Time','Nighttime') + ' - DriveNC.gov ' + id);
             });
             $('.btn-copy-helper-string').click(function(evt) {
                 evt.stopPropagation();
                 let id = $(this).data('dotReportid');
-                copyToClipboard(getReport(id).attributes.IncidentType.replace('Night Time','Nighttime') + ' - DriveNC.gov ' + id + '|' + formatDateTimeStringCH(report.attributes.start) + '|' + formatDateTimeStringCH(report.attributes.end));
+                copyToClipboard(getReport(id).attributes.incidentType.replace('Night Time','Nighttime') + ' - DriveNC.gov ' + id + '|' + formatDateTimeStringCH(report.attributes.start) + '|' + formatDateTimeStringCH(report.attributes.end));
             });
             $('.btn-copy-report-url').click(function(evt) {
                 evt.stopPropagation();
@@ -462,7 +462,7 @@
     function setArchiveReport(report, archive, updateUi, singleArchive) {
         report.archived = archive;
         if (archive) {
-            _settings.archivedReports[report.id] = {lastUpdated: report.attributes.LastUpdate};
+            _settings.archivedReports[report.id] = {lastUpdated: report.attributes.lastUpdate};
             report.imageDiv.addClass('nc-dot-archived-marker');
 
             let copyLink = $('#settingsCopyPL').is(':checked');
@@ -651,7 +651,7 @@
 
         let eventLookup = {1:"None", 138:"Hurricane Matthew"};
         let content = [];
-        content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Road:</div><div class="nc-dot-popover-data">' + removeNull(attr.RoadFullName) + '</div></div>');
+        content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Road:</div><div class="nc-dot-popover-data">' + removeNull(attr.roadFullName) + '</div></div>');
         content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">City:</div><div class="nc-dot-popover-data">' + removeNull(attr.city) + '  (' + removeNull(attr.countyName) + ' County)</div></div>');
         content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Location:</div><div class="nc-dot-popover-data">' + removeNull(attr.location) + '</div></div>');
         content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Reason:</div><div class="nc-dot-popover-data">' + removeNull(attr.reason) + '</div></div>');
@@ -691,7 +691,7 @@
             'data-toggle':'popover',
             title:'',
             'data-content':content.join(''),
-            'data-original-title':'<div style"width:100%;"><div class="dot-header"><strong>' + attr.id + ':</strong>&nbsp;' + attr.RoadFullName + ' - ' + attr.condition + '</div><div style="float:right;"><a class="close-popover" href="javascript:void(0);">X</a></div><div style="clear:both;"</div></div>'
+            'data-original-title':'<div style"width:100%;"><div class="dot-header"><strong>' + attr.id + ':</strong>&nbsp;' + attr.roadFullName + ' - ' + attr.condition + '</div><div style="float:right;"><a class="close-popover" href="javascript:void(0);">X</a></div><div style="clear:both;"</div></div>'
         })
 
         .popover({trigger: 'manual', html:true,placement: 'auto top', template:popoverTemplate})
@@ -775,7 +775,7 @@
                 report.id = reportDetails.id;
                 report.attributes = reportDetails;
                 if (conditionFilter.indexOf(report.attributes.condition) > -1) {
-                    report.attributes.RoadFullName = report.attributes.road + (report.attributes.commonName && (report.attributes.commonName !== report.attributes.road) ? '  (' + report.attributes.commonName + ')' : '');
+                    report.attributes.roadFullName = report.attributes.road + (report.attributes.commonName && (report.attributes.commonName !== report.attributes.road) ? '  (' + report.attributes.commonName + ')' : '');
                     report.archived = false;
                     if (_settings.archivedReports.hasOwnProperty(report.id)) {
                         if ( _settings.archivedReports[report.id].lastUpdated != report.attributes.lastUpdate) {
@@ -788,7 +788,7 @@
                     _reportsClosures.push(report);
                 }
                 if (conditionFilter2.indexOf(report.attributes.Condition) > -1) {
-                    report.attributes.RoadFullName = report.attributes.road + (report.attributes.commonName && (report.attributes.commonName !== report.attributes.road) ? '  (' + report.attributes.commonName + ')' : '');
+                    report.attributes.roadFullName = report.attributes.road + (report.attributes.commonName && (report.attributes.commonName !== report.attributes.road) ? '  (' + report.attributes.commonName + ')' : '');
                     report.archived = false;
                     if (_settings.archivedReports.hasOwnProperty(report.id)) {
                         if ( _settings.archivedReports[report.id].lastUpdated != report.attributes.lastUpdate) {
