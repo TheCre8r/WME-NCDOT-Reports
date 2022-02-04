@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME NCDOT Reports
 // @namespace    https://greasyfork.org/users/45389
-// @version      2021.11.06.01
+// @version      2022.02.04.01
 // @description  Display NC transportation department reports in WME.
 // @author       MapOMatic, The_Cre8r, and ABelter
 // @license      GNU GPLv3
@@ -23,8 +23,8 @@
 (function() {
     'use strict';
 
-    const REPORTS_URL = 'https://tims.ncdot.gov/tims/api/incidents/verbose';
-    const CAMERAS_URL = 'https://tims.ncdot.gov/tims/api/traffic/cameras/'
+    const REPORTS_URL = 'https://eapps.ncdot.gov/services/traffic-prod/v1/incidents?verbose=true';
+    const CAMERAS_URL = 'https://eapps.ncdot.gov/services/traffic-prod/v1/cameras?verbose=true'
 
     let _window = unsafeWindow ? unsafeWindow : window;
     const STORE_NAME = "nc_dot_report_settings";
@@ -33,7 +33,7 @@
     const UPDATE_ALERT = true;
     const SCRIPT_CHANGES = [
         '<ul>',
-            '<li>Added <b>Local Traffic Only</b> to the list that is imported.</li>',
+        '<li>Updated to new DriveNC API and removed extra API calls</li>',
         '</ul>'
     ].join('\n');
 
@@ -45,7 +45,7 @@
     let _cameras = [];
     let _lastShownTooltipDiv;
     let _tableSortKeys = [];
-    let _columnSortOrder = ['attributes.LastUpdate', 'attributes.Start', 'attributes.End','attributes.Road', 'attributes.Condition','attributes.City'];
+    let _columnSortOrder = ['attributes.lastUpdate', 'attributes.start', 'attributes.end','attributes.road', 'attributes.condition','attributes.city'];
     let _reportTitles = {incident: 'INCIDENT'};
     let _mapLayer;
     let _cameraLayer;
@@ -213,13 +213,13 @@
 
     function sendToSheet(id,status) {
         let roadName = getReport(id).attributes.RoadFullName;
-        let closeDate = formatDateString(getReport(id).attributes.Start);
-        let closeTime = formatTimeString(getReport(id).attributes.Start);
-        let openDate = formatDateString(getReport(id).attributes.End);
-        let openTime = formatTimeString(getReport(id).attributes.End);
-        let closureReason = getReport(id).attributes.IncidentType + ' - ' + getReport(id).attributes.Reason;
+        let closeDate = formatDateString(getReport(id).attributes.start);
+        let closeTime = formatTimeString(getReport(id).attributes.start);
+        let openDate = formatDateString(getReport(id).attributes.end);
+        let openTime = formatTimeString(getReport(id).attributes.end);
+        let closureReason = getReport(id).attributes.incidentType + ' - ' + getReport(id).attributes.reason;
         let timsURL = 'https://drivenc.gov/?type=incident&id=' + id;
-        let closureDirection = getReport(id).attributes.Direction;
+        let closureDirection = getReport(id).attributes.direction;
         let permalink = document.querySelector(".WazeControlPermalink .permalink").href;
         permalink = permalink.replace(/(&s=[0-9]{6,14}&)/,'&');
 
@@ -403,7 +403,7 @@
 
             $div.popover('show');
             if (hideLocated) { $('#pushlocated').hide();
-            } else { $('#pushlocated').show(); }
+                             } else { $('#pushlocated').show(); }
             _mapLayer.setZIndex(10001); // this is to help make sure the report shows on top of the turn restriction arrow layer
             _cameraLayer.setZIndex(10001);
 
@@ -428,7 +428,7 @@
             $('.btn-copy-helper-string').click(function(evt) {
                 evt.stopPropagation();
                 let id = $(this).data('dotReportid');
-                copyToClipboard(getReport(id).attributes.IncidentType.replace('Night Time','Nighttime') + ' - DriveNC.gov ' + id + '|' + formatDateTimeStringCH(report.attributes.Start) + '|' + formatDateTimeStringCH(report.attributes.End));
+                copyToClipboard(getReport(id).attributes.IncidentType.replace('Night Time','Nighttime') + ' - DriveNC.gov ' + id + '|' + formatDateTimeStringCH(report.attributes.start) + '|' + formatDateTimeStringCH(report.attributes.end));
             });
             $('.btn-copy-report-url').click(function(evt) {
                 evt.stopPropagation();
@@ -510,12 +510,12 @@
                     }
                 )
             ),
-//            $('<td>',{class:'clickable centered'}).append($img),
-            $('<td>').text(report.attributes.Road),
-            $('<td>').html('<div class="citycounty" style="border-bottom:1px dotted #dcdcdc;">' + report.attributes.City + ' (' + report.attributes.CountyName + ')</div>' + report.attributes.Condition),
-            $('<td>').text(formatDateTimeStringTable(report.attributes.Start)),
-            $('<td>').text(formatDateTimeStringTable(report.attributes.End)),
-            $('<td>').text(formatDateTimeStringTable(report.attributes.LastUpdate))
+            //            $('<td>',{class:'clickable centered'}).append($img),
+            $('<td>').text(report.attributes.road),
+            $('<td>').html('<div class="citycounty" style="border-bottom:1px dotted #dcdcdc;">' + report.attributes.city + ' (' + report.attributes.countyName + ')</div>' + report.attributes.condition),
+            $('<td>').text(formatDateTimeStringTable(report.attributes.start)),
+            $('<td>').text(formatDateTimeStringTable(report.attributes.end)),
+            $('<td>').text(formatDateTimeStringTable(report.attributes.lastUpdate))
         )
         .click(function () {
             let $row = $(this);
@@ -539,23 +539,23 @@
         let showCity = $('#settingsShowCityCounty').is(':checked');
         switch (/nc-dot-table-(.*)-header/.exec(obj.id)[1]) {
             case 'roadname':
-                prop = 'attributes.Road';
+                prop = 'attributes.road';
                 break;
             case 'start':
-                prop = 'attributes.Start';
+                prop = 'attributes.start';
                 break;
             case 'desc':
                 if(showCity) {
-                    prop = 'attributes.City';
+                    prop = 'attributes.city';
                 } else {
-                    prop = 'attributes.Condition';
+                    prop = 'attributes.condition';
                 }
                 break;
             case 'end':
-                prop = 'attributes.End';
+                prop = 'attributes.end';
                 break;
             case 'updated':
-                prop = 'attributes.LastUpdate';
+                prop = 'attributes.lastUpdate';
                 break;
             case 'archive':
                 prop = 'archived';
@@ -587,7 +587,7 @@
             $('<tr>').append(
                 $('<th>', {id:'nc-dot-table-archive-header',class:'centered'}).append(
                     $('<span>', {class:'fa fa-archive',style:'font-size:120%',title:'Sort by archived'}))).append(
-//                $('<th>', {id:'nc-dot-table-category-header',title:'Sort by report type'})).append(
+                //                $('<th>', {id:'nc-dot-table-category-header',title:'Sort by report type'})).append(
                 $('<th>',{id:'nc-dot-table-roadname-header',title:'Sort by road'}).text('Road'),
                 $('<th>',{id:'nc-dot-table-desc-header',title:'Sort by description'}).text('Desc'),
                 $('<th>',{id:'nc-dot-table-start-header',title:'Sort by start date'}).text('Start'),
@@ -628,7 +628,7 @@
         report.imgUrl = _imagesPath + imgName;
         let icon = new OpenLayers.Icon(report.imgUrl,size,null);
         let marker = new OpenLayers.Marker(
-            new OpenLayers.LonLat(report.attributes.Longitude,report.attributes.Latitude).transform(
+            new OpenLayers.LonLat(report.attributes.longitude,report.attributes.latitude).transform(
                 new OpenLayers.Projection("EPSG:4326"),
                 W.map.getProjectionObject()
             ),
@@ -646,36 +646,36 @@
         _mapLayer.addMarker(marker);
 
         let detailsUrl = 'https://drivenc.gov/?type=incident&id=';
-		let adminUrl = 'https://tims.ncdot.gov/tims/V2/Incident/Details/';
-		let TIMSadmin = $('#secureSite').is(':checked');
+        let adminUrl = 'https://tims.ncdot.gov/tims/V2/Incident/Details/';
+        let TIMSadmin = $('#secureSite').is(':checked');
 
         let eventLookup = {1:"None", 138:"Hurricane Matthew"};
         let content = [];
         content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Road:</div><div class="nc-dot-popover-data">' + removeNull(attr.RoadFullName) + '</div></div>');
-        content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">City:</div><div class="nc-dot-popover-data">' + removeNull(attr.City) + '  (' + removeNull(attr.CountyName) + ' County)</div></div>');
-        content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Location:</div><div class="nc-dot-popover-data">' + removeNull(attr.Location) + '</div></div>');
-        content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Reason:</div><div class="nc-dot-popover-data">' + removeNull(attr.Reason) + '</div></div>');
+        content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">City:</div><div class="nc-dot-popover-data">' + removeNull(attr.city) + '  (' + removeNull(attr.countyName) + ' County)</div></div>');
+        content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Location:</div><div class="nc-dot-popover-data">' + removeNull(attr.location) + '</div></div>');
+        content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Reason:</div><div class="nc-dot-popover-data">' + removeNull(attr.reason) + '</div></div>');
         //if (eventLookup.hasOwnProperty(attr.EventID)) { content.push('<span style="font-weight:bold">Event Name:</span>&nbsp;&nbsp;' + eventLookup[attr.EventID] + '<br>'); }
         //content.push('<span style="font-weight:bold">TIMS ID:</span>&nbsp;&nbsp;' + removeNull(attr.Id) + '<br>');
         content.push('<hr style="margin:4px 0px; border-color:#dcdcdc">');
-        content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Start Time:</div><div class="nc-dot-popover-data monospace">' + formatDateTimeString(attr.Start) + '</div></div>');
-        content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">End Time:</div><div class="nc-dot-popover-data monospace">' + formatDateTimeString(attr.End) + '</div></div>');
-        if (attr.ConstructionDateTime) {
+        content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Start Time:</div><div class="nc-dot-popover-data monospace">' + formatDateTimeString(attr.start) + '</div></div>');
+        content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">End Time:</div><div class="nc-dot-popover-data monospace">' + formatDateTimeString(attr.end) + '</div></div>');
+        if (attr.constructionDateTime) {
             content.push('<hr style="margin:4px 0px; border-color:#dcdcdc">');
-            content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Closure Date/Time:</div><div class="nc-dot-popover-data monospace" >' + removeNull(attr.ConstructionDateTime) + '</div></div>');
+            content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Closure Date/Time:</div><div class="nc-dot-popover-data monospace" >' + removeNull(attr.constructionDateTime) + '</div></div>');
         }
         content.push('<hr style="margin:4px 0px; border-color:#dcdcdc">');
-        content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Last Updated:</div><div class="nc-dot-popover-data monospace">' + formatDateTimeString(attr.LastUpdate) + '</div></div>');
+        content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Last Updated:</div><div class="nc-dot-popover-data monospace">' + formatDateTimeString(attr.lastUpdate) + '</div></div>');
         content.push('<hr style="margin:4px 0px; border-color:#dcdcdc">');
-        content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label" style="padding-top: 6px;">RTC Description:</div><div class="nc-dot-popover-data">' + removeNull(attr.IncidentType).replace('Night Time','Nighttime') + ' - DriveNC.gov ' + report.id + '&nbsp;&nbsp;<button type="button" title="Copy short description to clipboard" class="btn-dot btn-dot-secondary btn-copy-description" data-dot-reportid="' + report.id + '" style="margin-left:6px;"><span class="fa fa-copy" /></button></div></div>');
+        content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label" style="padding-top: 6px;">RTC Description:</div><div class="nc-dot-popover-data">' + removeNull(attr.incidentType).replace('Night Time','Nighttime') + ' - DriveNC.gov ' + report.id + '&nbsp;&nbsp;<button type="button" title="Copy short description to clipboard" class="btn-dot btn-dot-secondary btn-copy-description" data-dot-reportid="' + report.id + '" style="margin-left:6px;"><span class="fa fa-copy" /></button></div></div>');
         if (TIMSadmin) {
-			content.push('<hr style="margin:5px 0px; border-color:#dcdcdc"><div style="display:table;width:100%"><button type="button" class="btn-dot btn-dot-primary btn-open-dot-report" data-dot-report-url="' + adminUrl + report.id + '" style="float:left;">TIMS Admin <span class="fa fa-external-link" /></button><button type="button" title="Copy TIMS Admin URL to clipboard" class="btn-dot btn-dot-secondary btn-copy-report-url" data-dot-reporturl="' + adminUrl + report.id + '" style="float:left;margin-left:6px;"><span class="fa fa-copy" /> URL</button>');
+            content.push('<hr style="margin:5px 0px; border-color:#dcdcdc"><div style="display:table;width:100%"><button type="button" class="btn-dot btn-dot-primary btn-open-dot-report" data-dot-report-url="' + adminUrl + report.id + '" style="float:left;">TIMS Admin <span class="fa fa-external-link" /></button><button type="button" title="Copy TIMS Admin URL to clipboard" class="btn-dot btn-dot-secondary btn-copy-report-url" data-dot-reporturl="' + adminUrl + report.id + '" style="float:left;margin-left:6px;"><span class="fa fa-copy" /> URL</button>');
         } else {
-			content.push('<hr style="margin:5px 0px; border-color:#dcdcdc"><div style="display:table;width:100%"><button type="button" class="btn-dot btn-dot-primary btn-open-dot-report" data-dot-report-url="' + detailsUrl + report.id + '" style="float:left;">DriveNC.gov <span class="fa fa-external-link" /></button><button type="button" title="Copy DriveNC URL to clipboard" class="btn-dot btn-dot-secondary btn-copy-report-url" data-dot-reporturl="' + detailsUrl + report.id + '" style="float:left;margin-left:6px;"><span class="fa fa-copy" /> URL</button>');
-		}
+            content.push('<hr style="margin:5px 0px; border-color:#dcdcdc"><div style="display:table;width:100%"><button type="button" class="btn-dot btn-dot-primary btn-open-dot-report" data-dot-report-url="' + detailsUrl + report.id + '" style="float:left;">DriveNC.gov <span class="fa fa-external-link" /></button><button type="button" title="Copy DriveNC URL to clipboard" class="btn-dot btn-dot-secondary btn-copy-report-url" data-dot-reporturl="' + detailsUrl + report.id + '" style="float:left;margin-left:6px;"><span class="fa fa-copy" /> URL</button>');
+        }
         content.push('<button type="button" style="float:right;" class="btn-dot btn-dot-primary btn-archive-dot-report" data-dot-report-id="' + report.id + '">Archive</button></div>');
 
-		if (_user === 'abelter') {
+        if (_user === 'abelter') {
             content.push('<div style="display:table;width:100%;margin-top:5px;"><button type="button" id="pushlocated" title="Push to NC Closures Sheet as Located" class="btn-dot btn-dot-secondary btn-push-to-sheet" data-dot-reportid="' + report.id + '" data-dot-status="Located"style="margin-right:6px;"><span class="" />Post to Sheet - Located</button>');
             if (_rank >= 3) {
                 content.push('<button type="button" title="Push to NC Closures Sheet as Closed" class="btn-dot btn-dot-secondary btn-push-to-sheet" data-dot-reportid="' + report.id + '" data-dot-status="Closed"><span class="" />Post to Sheet - Closed</button>');
@@ -691,7 +691,7 @@
             'data-toggle':'popover',
             title:'',
             'data-content':content.join(''),
-            'data-original-title':'<div style"width:100%;"><div class="dot-header"><strong>' + attr.Id + ':</strong>&nbsp;' + attr.RoadFullName + ' - ' + attr.Condition + '</div><div style="float:right;"><a class="close-popover" href="javascript:void(0);">X</a></div><div style="clear:both;"</div></div>'
+            'data-original-title':'<div style"width:100%;"><div class="dot-header"><strong>' + attr.id + ':</strong>&nbsp;' + attr.RoadFullName + ' - ' + attr.condition + '</div><div style="float:right;"><a class="close-popover" href="javascript:void(0);">X</a></div><div style="clear:both;"</div></div>'
         })
 
         .popover({trigger: 'manual', html:true,placement: 'auto top', template:popoverTemplate})
@@ -753,7 +753,7 @@
             'Permanent Road Closure',
             'Ramp Closed',
             'Ferry Closed',
-	    'Local Traffic Only',
+            'Local Traffic Only',
             'Rest Area Closed',
             'Road Closed',
             'Road Closed with Detour',
@@ -768,16 +768,17 @@
             'Cleared'
         ];
         reports.forEach(function(reportDetails) {
-            if (!reportIDs.hasOwnProperty(reportDetails.Id)) {
-                reportIDs[reportDetails.Id] = reportDetails.Id;
+            if (!reportIDs.hasOwnProperty(reportDetails.id)) {
+                console.log(reportDetails)
+                reportIDs[reportDetails.id] = reportDetails.id;
                 let report = {};
-                report.id = reportDetails.Id;
+                report.id = reportDetails.id;
                 report.attributes = reportDetails;
-                if (conditionFilter.indexOf(report.attributes.Condition) > -1) {
-                    report.attributes.RoadFullName = report.attributes.Road + (report.attributes.CommonName && (report.attributes.CommonName !== report.attributes.Road) ? '  (' + report.attributes.CommonName + ')' : '');
+                if (conditionFilter.indexOf(report.attributes.condition) > -1) {
+                    report.attributes.RoadFullName = report.attributes.road + (report.attributes.commonName && (report.attributes.commonName !== report.attributes.road) ? '  (' + report.attributes.commonName + ')' : '');
                     report.archived = false;
                     if (_settings.archivedReports.hasOwnProperty(report.id)) {
-                        if ( _settings.archivedReports[report.id].lastUpdated != report.attributes.LastUpdate) {
+                        if ( _settings.archivedReports[report.id].lastUpdated != report.attributes.lastUpdate) {
                             delete _settings.archivedReports[report.id];
                         } else {
                             report.archived = true;
@@ -787,10 +788,10 @@
                     _reportsClosures.push(report);
                 }
                 if (conditionFilter2.indexOf(report.attributes.Condition) > -1) {
-                    report.attributes.RoadFullName = report.attributes.Road + (report.attributes.CommonName && (report.attributes.CommonName !== report.attributes.Road) ? '  (' + report.attributes.CommonName + ')' : '');
+                    report.attributes.RoadFullName = report.attributes.road + (report.attributes.commonName && (report.attributes.commonName !== report.attributes.road) ? '  (' + report.attributes.commonName + ')' : '');
                     report.archived = false;
                     if (_settings.archivedReports.hasOwnProperty(report.id)) {
-                        if ( _settings.archivedReports[report.id].lastUpdated != report.attributes.LastUpdate) {
+                        if ( _settings.archivedReports[report.id].lastUpdated != report.attributes.lastUpdate) {
                             delete _settings.archivedReports[report.id];
                         } else {
                             report.archived = true;
@@ -823,94 +824,86 @@
         });
     }
 
-    function fetchCameraByID(id){
-        return $.getJSON(`https://tims.ncdot.gov/tims/api/traffic/cameras/`+id).then(function(data){
-            return data;
-        });
-    }
-
-
     function fetchCameras() {
         GM_xmlhttpRequest({
             method: 'GET',
             url: CAMERAS_URL,
             onload: function(res) {
                 let features = $.parseJSON(res.responseText);
-                console.log(features)
                 features.forEach(function(report) {
-                    fetchCameraByID(report.id).then(function(returndata){
-                        let cameraDetails = returndata
-                        let size = new OpenLayers.Size(32,32);
-                        let offset = new OpenLayers.Pixel(-(size.w/2), -size.h);
-                        let now = new Date(Date.now());
-                        let imgName = 'camera.png';
-                        report.imgUrl = _imagesPath + imgName;
-                        let icon = new OpenLayers.Icon(report.imgUrl,size,null);
-                        let marker = new OpenLayers.Marker(
-                            new OpenLayers.LonLat(report.longitude,report.latitude).transform(
-                                new OpenLayers.Projection("EPSG:4326"),
-                                W.map.getProjectionObject()
-                            ),
-                            icon
-                        );
+                    if (report.status == "OFF") {
+                        return;
+                    }
+                    let size = new OpenLayers.Size(32,32);
+                    let offset = new OpenLayers.Pixel(-(size.w/2), -size.h);
+                    let now = new Date(Date.now());
+                    let imgName = 'camera.png';
+                    report.imgUrl = _imagesPath + imgName;
+                    let icon = new OpenLayers.Icon(report.imgUrl,size,null);
+                    let marker = new OpenLayers.Marker(
+                        new OpenLayers.LonLat(report.longitude,report.latitude).transform(
+                            new OpenLayers.Projection("EPSG:4326"),
+                            W.map.getProjectionObject()
+                        ),
+                        icon
+                    );
 
-                        let popoverTemplate = ['<div class="reportPopover popover" style="max-width:450px;width:385px;min-height:280px;">',
-                                               '<div class="arrow"></div>',
-                                               '<div class="popover-title"></div>',
-                                               '<div class="popover-content">',
-                                               '</div>',
-                                               '</div>'].join('');
-                        marker.report = report;
-                        _cameraLayer.addMarker(marker);
+                    let popoverTemplate = ['<div class="reportPopover popover" style="max-width:450px;width:385px;min-height:280px;">',
+                                           '<div class="arrow"></div>',
+                                           '<div class="popover-title"></div>',
+                                           '<div class="popover-content">',
+                                           '</div>',
+                                           '</div>'].join('');
+                    marker.report = report;
+                    _cameraLayer.addMarker(marker);
 
-                        let re=/window.open\('(.*?)'/;
-                        let cameraImgUrl = cameraDetails.imageURL;
-                        let cameraContent = [];
-                        cameraContent.push('<img id="camera-img-'+ report.id +'" src=' + cameraImgUrl + '&t=' + new Date().getTime() + ' style="max-width:352px">');
-                        cameraContent.push('<div><hr style="margin:5px 0px;border-color:#dcdcdc"><div style="display:table;width:100%"><button type="button" class="btn-dot btn-dot-primary btn-open-camera-img" data-camera-img-url="' + cameraImgUrl + '" style="float:left;">Open Image Full-Size</button><button type="button" class="btn-dot btn-dot-primary btn-refresh-camera-img" data-camera-img-url="' + cameraImgUrl + '" style="float:right;"><span class="fa fa-refresh" /></button></div></div>');
-                        let $imageDiv = $(marker.icon.imageDiv)
-                        .css('cursor', 'pointer')
-                        .addClass('ncDotReport')
-                        .attr({
-                            'data-toggle':'popover',
-                            title:'',
-                            'data-content':cameraContent.join(''),
-                            'data-original-title':'<div style"width:100%;"><div class="dot-header camera">' + cameraDetails.locationName + '</div><div style="float:right;"><a class="close-popover" href="javascript:void(0);">X</a></div><div style="clear:both;"</div></div>'
-                        })
-                        .data('cameraId', report.id)
-                        .popover({trigger: 'manual', html:true,placement: 'top', template:popoverTemplate})
-                        .on('click', function(evt) {
-                            //let $div = $(this);
-                            // let camera = getCamera($div.data('cameraId'));
-                            evt.stopPropagation();
-                            let $div = $(this);
-                            hideAllPopovers($div);
-                            if ($div.data('state') !== 'pinned') {
-                                let id = $div.data('cameraId');
-                                $div.data('state', 'pinned');
-                                //W.map.moveTo(report.marker.lonlat);
-                                $div.popover('show');
-                                document.getElementById('camera-img-'+id).src = cameraImgUrl + "&t=" + new Date().getTime(); //by default the images are loaded on page load, this line loads the latest image when the pop-up is opened
-                                $('.btn-open-camera-img').click(function(evt) {evt.stopPropagation(); window.open($(this).data('cameraImgUrl'),'_blank');});
-                                $('.btn-refresh-camera-img').click(function(evt) {evt.stopPropagation(); document.getElementById('camera-img-'+id).src = $(this).data('cameraImgUrl') + "&t=" + new Date().getTime();});
-                                $('.reportPopover,.close-popover').click(function(evt) {
-                                    $div.data('state', '');
-                                    $div.popover('hide');
-                                });
-                                //$(".close-popover").click(function() {hideAllReportPopovers();});
-                            } else {
+                    let re=/window.open\('(.*?)'/;
+                    let cameraImgUrl = report.imageURL;
+                    let cameraContent = [];
+                    cameraContent.push('<img id="camera-img-'+ report.id +'" src=' + cameraImgUrl + '&t=' + new Date().getTime() + ' style="max-width:352px">');
+                    cameraContent.push('<div><hr style="margin:5px 0px;border-color:#dcdcdc"><div style="display:table;width:100%"><button type="button" class="btn-dot btn-dot-primary btn-open-camera-img" data-camera-img-url="' + cameraImgUrl + '" style="float:left;">Open Image Full-Size</button><button type="button" class="btn-dot btn-dot-primary btn-refresh-camera-img" data-camera-img-url="' + cameraImgUrl + '" style="float:right;"><span class="fa fa-refresh" /></button></div></div>');
+                    let $imageDiv = $(marker.icon.imageDiv)
+                    .css('cursor', 'pointer')
+                    .addClass('ncDotReport')
+                    .attr({
+                        'data-toggle':'popover',
+                        title:'',
+                        'data-content':cameraContent.join(''),
+                        'data-original-title':'<div style"width:100%;"><div class="dot-header camera">' + report.locationName + '</div><div style="float:right;"><a class="close-popover" href="javascript:void(0);">X</a></div><div style="clear:both;"</div></div>'
+                    })
+                    .data('cameraId', report.id)
+                    .popover({trigger: 'manual', html:true,placement: 'top', template:popoverTemplate})
+                    .on('click', function(evt) {
+                        //let $div = $(this);
+                        // let camera = getCamera($div.data('cameraId'));
+                        evt.stopPropagation();
+                        let $div = $(this);
+                        hideAllPopovers($div);
+                        if ($div.data('state') !== 'pinned') {
+                            let id = $div.data('cameraId');
+                            $div.data('state', 'pinned');
+                            //W.map.moveTo(report.marker.lonlat);
+                            $div.popover('show');
+                            document.getElementById('camera-img-'+id).src = cameraImgUrl + "&t=" + new Date().getTime(); //by default the images are loaded on page load, this line loads the latest image when the pop-up is opened
+                            $('.btn-open-camera-img').click(function(evt) {evt.stopPropagation(); window.open($(this).data('cameraImgUrl'),'_blank');});
+                            $('.btn-refresh-camera-img').click(function(evt) {evt.stopPropagation(); document.getElementById('camera-img-'+id).src = $(this).data('cameraImgUrl') + "&t=" + new Date().getTime();});
+                            $('.reportPopover,.close-popover').click(function(evt) {
                                 $div.data('state', '');
                                 $div.popover('hide');
-                            }
-                        })
-                        .data('cameraId', report.id)
-                        .data('state', '');
+                            });
+                            //$(".close-popover").click(function() {hideAllReportPopovers();});
+                        } else {
+                            $div.data('state', '');
+                            $div.popover('hide');
+                        }
+                    })
+                    .data('cameraId', report.id)
+                    .data('state', '');
 
-                        $imageDiv.data('report', report);
-                        report.imageDiv = $imageDiv;
-                        report.marker = marker;
-                        _cameras.push(report);
-                    });
+                    $imageDiv.data('report', report);
+                    report.imageDiv = $imageDiv;
+                    report.marker = marker;
+                    _cameras.push(report);
                 });
             }
         });
@@ -1065,9 +1058,9 @@
             $('<ul>', {id:'ncdot-tabs', class:'nav nav-tabs'}).append(
                 $('<li>',{class:'active'}).append(
                     $('<a>',{id:'ncdot-tabstitle-closures',href:'#ncdot-tabs-closures','data-toggle':'tab'}).text('Closures')
-                //),
-                //$('<li>').append(
-                //    $('<a>',{id:'ncdot-tabstitle-cleared',href:'#ncdot-tabs-cleared','data-toggle':'tab'}).text('Cleared')
+                    //),
+                    //$('<li>').append(
+                    //    $('<a>',{id:'ncdot-tabstitle-cleared',href:'#ncdot-tabs-cleared','data-toggle':'tab'}).text('Cleared')
                 ),
                 $('<li>').append(
                     $('<a>',{id:'ncdot-tabstitle-settings',href:'#ncdot-tabs-settings','data-toggle':'tab'}).text('Settings')
@@ -1085,7 +1078,7 @@
                     ),
                     $('<label id="ncdotFilterLabel" style="width:100%; cursor:pointer; border-bottom: 1px solid #e0e0e0; margin-top:9px;" data-toggle="collapse" data-target="#ncDotFilterCollapse"><span class="fa fa-caret-down" style="margin-right:5px;font-size:120%;"></span>Filters</label>'),
                     $('<div>',{id:'ncDotFilterCollapse',class:'collapse',style:'font-size:12px;'}
-                    ).append(
+                     ).append(
                         $('<div>',{class:'controls-container',style:'font-weight:bold;display:block;'}).text('Hide Reports... ')
                     ).append(
                         $('<div>',{class:'controls-container',style:'width:60%; display:inline-block;'})
@@ -1173,13 +1166,13 @@
                             copyIncidentIDsToClipboard();
                             WazeWrap.Alerts.success(SCRIPT_NAME, 'IDs have been copied to the clipboard.');
                         }),
-                    $('<div>',{class:'controls-container'})
-                    .append($('<input>', {type:'checkbox',name:'secureSite',id:'secureSite'}).change(function(){
-                        saveSettingsToStorage();
-                        hideAllReportPopovers();
-                        fetchReports(true);
-                    }))
-                    .append($('<label>', {for:'secureSite'}).text('Use TIMS Admin site instead of DriveNC'))
+                        $('<div>',{class:'controls-container'})
+                        .append($('<input>', {type:'checkbox',name:'secureSite',id:'secureSite'}).change(function(){
+                            saveSettingsToStorage();
+                            hideAllReportPopovers();
+                            fetchReports(true);
+                        }))
+                        .append($('<label>', {for:'secureSite'}).text('Use TIMS Admin site instead of DriveNC'))
                     )
                 )
             )
@@ -1284,7 +1277,7 @@
                 hideSRHighwaysReports:false,
                 hideXDaysReports:false,
                 hideXDaysNumber:7,
-				secureSite:false,
+                secureSite:false,
                 archivedReports:{},
                 lastSaved: 0
             };
