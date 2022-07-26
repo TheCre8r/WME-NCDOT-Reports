@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME NCDOT Reports
 // @namespace    https://greasyfork.org/users/45389
-// @version      2022.02.04.02
+// @version      2022.07.26.01
 // @description  Display NC transportation department reports in WME.
 // @author       MapOMatic, The_Cre8r, and ABelter
 // @license      GNU GPLv3
@@ -33,7 +33,7 @@
     const UPDATE_ALERT = true;
     const SCRIPT_CHANGES = [
         '<ul>',
-        '<li>Updated to new DriveNC API and removed extra API calls</li>',
+        '<li>fixed popup windows, made draggable</li>',
         '</ul>'
     ].join('\n');
 
@@ -374,14 +374,14 @@
             let $div = rpt.imageDiv;
             if ((!$excludeDiv || $div[0] !== $excludeDiv[0]) && $div.data('state') === 'pinned') {
                 $div.data('state', '');
-                $div.popover('hide');
+                removePopup(rpt);
             }
         });
         _cameras.forEach(function(rpt) {
             let $div = rpt.imageDiv;
             if ((!$excludeDiv || $div[0] !== $excludeDiv[0]) && $div.data('state') === 'pinned') {
                 $div.data('state', '');
-                $div.popover('hide');
+                removePopup(rpt);
             }
         });
     }
@@ -394,14 +394,14 @@
 
     function toggleMarkerPopover($div) {
         hideAllPopovers($div);
+        let id = $div.data('reportId');
+        let report = getReport(id);
         if ($div.data('state') !== 'pinned') {
-            let id = $div.data('reportId');
-            let report = getReport(id);
             let hideLocated = $('#settingsHideLocated').is(':checked');
             $div.data('state', 'pinned');
-            W.map.getOLMap().moveTo(report.marker.lonlat);
+            // W.map.getOLMap().moveTo(report.marker.lonlat);
 
-            $div.popover('show');
+            showPopup(report);
             if (hideLocated) { $('#pushlocated').hide();
                              } else { $('#pushlocated').show(); }
             _mapLayer.setZIndex(10001); // this is to help make sure the report shows on top of the turn restriction arrow layer
@@ -445,7 +445,7 @@
             $div.data('report').dataRow.css('background-color','#f1f1f1');
         } else {
             $div.data('state', '');
-            $div.popover('hide');
+            removePopup(report);
         }
     }
 
@@ -635,12 +635,6 @@
             icon
         );
 
-        let popoverTemplate = ['<div class="reportPopover popover" style="max-width:500px;width:500px;">',
-                               '<div class="arrow"></div>',
-                               '<div class="popover-title"></div>',
-                               '<div class="popover-content" style="font-size:12px;">',
-                               '</div>',
-                               '</div>'].join('');
         marker.report = report;
         //marker.events.register('click', marker, onMarkerClick);
         _mapLayer.addMarker(marker);
@@ -687,14 +681,6 @@
         let $imageDiv = $(marker.icon.imageDiv)
         .css('cursor', 'pointer')
         .addClass('ncDotReport')
-        .attr({
-            'data-toggle':'popover',
-            title:'',
-            'data-content':content.join(''),
-            'data-original-title':'<div style"width:100%;"><div class="dot-header"><strong>' + attr.id + ':</strong>&nbsp;' + attr.roadFullName + ' - ' + attr.condition + '</div><div style="float:right;"><a class="close-popover" href="javascript:void(0);">X</a></div><div style="clear:both;"</div></div>'
-        })
-
-        .popover({trigger: 'manual', html:true,placement: 'auto top', template:popoverTemplate})
         .on('click', function(evt) {evt.stopPropagation(); toggleReportPopover($(this));})
         .data('reportId', report.id)
         .data('state', '');
@@ -703,6 +689,79 @@
         if (report.archived) { $imageDiv.addClass('nc-dot-archived-marker'); }
         report.imageDiv = $imageDiv;
         report.marker = marker;
+        report.title = attr.condition;
+        report.width = "500px";
+        report.content = content.join('');
+    }
+
+    function showPopup(rpt)
+    {
+        var popHtml = '<div id="ncPopup" class="reportPop popup" style="max-width:' + rpt.width + ';width:' + rpt.width + ';">' +
+            '<div class="arrow"></div>' +
+            '<div class="pop-title " id="pop-drag">' + rpt.title + '<div style="float:right;"><div class="close-popover">X</div></div></div>' +
+            '<div class="pop-content">' + rpt.content + '</div>' +
+            '</div>';
+        $("body").append(popHtml);
+        var iconofs = rpt.imageDiv.offset();
+        var center = $("#ncPopup").width()/2;
+        var ofs = {};
+        ofs.top = iconofs.top + 30;
+        ofs.left = iconofs.left - center;
+        $("#ncPopup").offset( ofs );
+        $("#ncPopup").show();
+
+        // Make the popup draggable
+        dragElement(document.getElementById("ncPopup"));
+        $(".close-popover").click(function() {
+            toggleReportPopover(rpt.imageDiv);
+        });
+    }
+
+    // dragElement from https://www.w3schools.com/howto/howto_js_draggable.asp
+    function dragElement(elmnt) {
+      var pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+      if (document.getElementById("pop-drag")) {
+        // if present, the header is where you move the DIV from:
+        document.getElementById("pop-drag").onmousedown = dragMouseDown;
+      } else {
+        // otherwise, move the DIV from anywhere inside the DIV:
+        elmnt.onmousedown = dragMouseDown;
+      }
+
+      function dragMouseDown(e) {
+        e = e || window.event;
+        e.preventDefault();
+        // get the mouse cursor position at startup:
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+        document.onmouseup = closeDragElement;
+        // call a function whenever the cursor moves:
+        document.onmousemove = elementDrag;
+      }
+
+      function elementDrag(e) {
+        e = e || window.event;
+        e.preventDefault();
+        // calculate the new cursor position:
+        pos1 = pos3 - e.clientX;
+        pos2 = pos4 - e.clientY;
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+        // set the element's new position:
+        elmnt.style.top = (elmnt.offsetTop - pos2) + "px";
+        elmnt.style.left = (elmnt.offsetLeft - pos1) + "px";
+      }
+
+      function closeDragElement() {
+        // stop moving when mouse button is released:
+        document.onmouseup = null;
+        document.onmousemove = null;
+      }
+    }
+    function removePopup(rpt)
+    {
+        $("#ncPopup").remove();
+        $("#ncPopup").hide();
     }
 
     function openClosuresTab() {
@@ -848,12 +907,6 @@
                         icon
                     );
 
-                    let popoverTemplate = ['<div class="reportPopover popover" style="max-width:450px;width:385px;min-height:280px;">',
-                                           '<div class="arrow"></div>',
-                                           '<div class="popover-title"></div>',
-                                           '<div class="popover-content">',
-                                           '</div>',
-                                           '</div>'].join('');
                     marker.report = report;
                     _cameraLayer.addMarker(marker);
 
@@ -862,17 +915,13 @@
                     let cameraContent = [];
                     cameraContent.push('<img id="camera-img-'+ report.id +'" src=' + cameraImgUrl + '&t=' + new Date().getTime() + ' style="max-width:352px">');
                     cameraContent.push('<div><hr style="margin:5px 0px;border-color:#dcdcdc"><div style="display:table;width:100%"><button type="button" class="btn-dot btn-dot-primary btn-open-camera-img" data-camera-img-url="' + cameraImgUrl + '" style="float:left;">Open Image Full-Size</button><button type="button" class="btn-dot btn-dot-primary btn-refresh-camera-img" data-camera-img-url="' + cameraImgUrl + '" style="float:right;"><span class="fa fa-refresh" /></button></div></div>');
+                    report.content = cameraContent.join('');
+                    report.title = report.displayName;
+                    report.width = "370px";
                     let $imageDiv = $(marker.icon.imageDiv)
                     .css('cursor', 'pointer')
                     .addClass('ncDotReport')
-                    .attr({
-                        'data-toggle':'popover',
-                        title:'',
-                        'data-content':cameraContent.join(''),
-                        'data-original-title':'<div style"width:100%;"><div class="dot-header camera">' + report.locationName + '</div><div style="float:right;"><a class="close-popover" href="javascript:void(0);">X</a></div><div style="clear:both;"</div></div>'
-                    })
                     .data('cameraId', report.id)
-                    .popover({trigger: 'manual', html:true,placement: 'top', template:popoverTemplate})
                     .on('click', function(evt) {
                         //let $div = $(this);
                         // let camera = getCamera($div.data('cameraId'));
@@ -883,18 +932,18 @@
                             let id = $div.data('cameraId');
                             $div.data('state', 'pinned');
                             //W.map.moveTo(report.marker.lonlat);
-                            $div.popover('show');
+                            showPopup(report);
                             document.getElementById('camera-img-'+id).src = cameraImgUrl + "&t=" + new Date().getTime(); //by default the images are loaded on page load, this line loads the latest image when the pop-up is opened
                             $('.btn-open-camera-img').click(function(evt) {evt.stopPropagation(); window.open($(this).data('cameraImgUrl'),'_blank');});
                             $('.btn-refresh-camera-img').click(function(evt) {evt.stopPropagation(); document.getElementById('camera-img-'+id).src = $(this).data('cameraImgUrl') + "&t=" + new Date().getTime();});
                             $('.reportPopover,.close-popover').click(function(evt) {
                                 $div.data('state', '');
-                                $div.popover('hide');
+                                hidePopup(report);
                             });
                             //$(".close-popover").click(function() {hideAllReportPopovers();});
                         } else {
                             $div.data('state', '');
-                            $div.popover('hide');
+                            hidePopup(report);
                         }
                     })
                     .data('cameraId', report.id)
@@ -1219,6 +1268,9 @@
             '.refreshIcon:hover {color:#00a4eb} .refreshIcon:active{ text-shadow: 0px 0px; }',
             '.nc-dot-archived-marker {opacity:0.5;} ',
             '.nc-dot-table-label {font-size:85%;} .nc-dot-table-action:hover {color:#00a4eb;cursor:pointer} .nc-dot-table-label.right {float:right} .nc-dot-table-label.count {margin-left:4px;}',
+            '.reportPop {display: block; position: absolute; width: 500px;left: 30%;top: 35%;background: #fff;display: none;}',
+            '.pop-title {background: #efefef;border: #ddd solid 1px;position: relative;display: block;}',
+            '.pop-content {display: block;font-family: sans-serif;padding: 5px 10px;}',
             '.nc-dot-popover-cont {display: flex;}',
             '.nc-dot-popover-label {font-weight:bold; width: 115px; display: inline-block;}',
             '.nc-dot-popover-data {flex: 1;}',
