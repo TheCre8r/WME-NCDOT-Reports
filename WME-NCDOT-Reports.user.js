@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME NCDOT Reports
 // @namespace    https://greasyfork.org/users/45389
-// @version      2022.07.26.01
+// @version      2023.02.12.01
 // @description  Display NC transportation department reports in WME.
 // @author       MapOMatic, The_Cre8r, and ABelter
 // @license      GNU GPLv3
@@ -33,7 +33,10 @@
     const UPDATE_ALERT = true;
     const SCRIPT_CHANGES = [
         '<ul>',
-        '<li>fixed popup windows, made draggable</li>',
+        '<li>NEW: Polylines added to DriveNC incidents will now show in WME, to indicate the portion of road that\'s closed (can be disabled in settings)</li>',
+        '<li>Quality-of-life improvements and consistency with our recent NC Closures Sheet and Discord updates: show a road\'s common name first if it\'s an SR, replace "other" in the RTC Descriptions, copy beta WME PLs as prod WME, fix column widths due to WME changes</li>',
+        '<li>Cleaned up code for features that now live in the Closures Sheet and Discord (namely alerting when incidents clear early)</li>',
+        '<li>Removed broken camera refresh and open full size links until they can be fixed</li>',
         '</ul>'
     ].join('\n');
 
@@ -41,13 +44,13 @@
     let _settings = {};
     let _tabDiv = {}; // stores the user tab div so it can be restored after switching back from Events mode to Default mode
     let _reportsClosures = [];
-    //let _reportsClearedOrLanes = []; // future functionality
     let _cameras = [];
     let _lastShownTooltipDiv;
     let _tableSortKeys = [];
     let _columnSortOrder = ['attributes.lastUpdate', 'attributes.start', 'attributes.end','attributes.road', 'attributes.condition','attributes.city'];
     let _reportTitles = {incident: 'INCIDENT'};
     let _mapLayer;
+	let _polyLayer;
     let _cameraLayer;
     let _user;
     let _userU;
@@ -76,6 +79,7 @@
                 copyPL: $('#settingsCopyPL').is(':checked'),
                 copyDescription: $('#settingsCopyDescription').is(':checked'),
                 autoOpenClosures: $('#settingsAutoOpenClosures').is(':checked'),
+                hidePoly: $('#settingsHidePoly').is(':checked'),
                 hideArchivedReports: $('#settingsHideNCDotArchivedReports').is(':checked'),
                 hideAllButWeatherReports: $('#settingsHideNCDotAllButWeatherReports').is(':checked'),
                 hideInterstatesReports: $('#settingsHideNCDotInterstatesReports').is(':checked'),
@@ -217,7 +221,7 @@
         let closeTime = formatTimeString(getReport(id).attributes.start);
         let openDate = formatDateString(getReport(id).attributes.end);
         let openTime = formatTimeString(getReport(id).attributes.end);
-        let closureReason = getReport(id).attributes.incidentType + ' - ' + getReport(id).attributes.reason;
+        let closureReason = getReport(id).attributes.incidentType.replace('Other',report.attributes.condition) + ' - ' + getReport(id).attributes.reason;
         let timsURL = 'https://drivenc.gov/?type=incident&id=' + id;
         let closureDirection = getReport(id).attributes.direction;
         let permalink = document.querySelector(".WazeControlPermalink .permalink").href;
@@ -384,6 +388,7 @@
                 removePopup(rpt);
             }
         });
+		_polyLayer.removeAllFeatures();
     }
 
     function deselectAllDataRows() {
@@ -413,7 +418,7 @@
 
             let copyRTCDescription = $('#settingsCopyDescription').is(':checked');
             if (copyRTCDescription) {
-                copyToClipboard(getReport(id).attributes.incidentType.replace('Night Time','Nighttime') + ' - DriveNC.gov ' + id);
+                copyToClipboard(report.attributes.incidentType.replace('Night Time','Nighttime').replace('Other',report.attributes.condition) + ' - DriveNC.gov ' + id);
                 WazeWrap.Alerts.success(SCRIPT_NAME,"RTC Description copied to clipboard.");
             }
 
@@ -423,12 +428,12 @@
             $('.btn-copy-description').click(function(evt) {
                 evt.stopPropagation();
                 let id = $(this).data('dotReportid');
-                copyToClipboard(getReport(id).attributes.incidentType.replace('Night Time','Nighttime') + ' - DriveNC.gov ' + id);
+                copyToClipboard(report.attributes.incidentType.replace('Night Time','Nighttime').replace('Other',report.attributes.condition) + ' - DriveNC.gov ' + id);
             });
             $('.btn-copy-helper-string').click(function(evt) {
                 evt.stopPropagation();
                 let id = $(this).data('dotReportid');
-                copyToClipboard(getReport(id).attributes.incidentType.replace('Night Time','Nighttime') + ' - DriveNC.gov ' + id + '|' + formatDateTimeStringCH(report.attributes.start) + '|' + formatDateTimeStringCH(report.attributes.end));
+                copyToClipboard(getReport(id).attributes.incidentType.replace('Night Time','Nighttime').replace('Other',report.attributes.condition) + ' - DriveNC.gov ' + id + '|' + formatDateTimeStringCH(report.attributes.start) + '|' + formatDateTimeStringCH(report.attributes.end));
             });
             $('.btn-copy-report-url').click(function(evt) {
                 evt.stopPropagation();
@@ -468,7 +473,7 @@
             let copyLink = $('#settingsCopyPL').is(':checked');
             if (singleArchive && copyLink) {
                 let permalink = document.querySelector(".WazeControlPermalink .permalink").href;
-                permalink = permalink.replace(/(&s=[0-9]{6,14}&)/,'&');
+                permalink = permalink.replace(/(&s=[0-9]{6,14}&)/,'&').replace('beta','www');
 
                 if (!permalink.includes('segments=')) {
                     WazeWrap.Alerts.error(SCRIPT_NAME,"No segments were selected. Permalink was not copied to clipboard.");
@@ -661,11 +666,11 @@
         content.push('<hr style="margin:4px 0px; border-color:#dcdcdc">');
         content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Last Updated:</div><div class="nc-dot-popover-data monospace">' + formatDateTimeString(attr.lastUpdate) + '</div></div>');
         content.push('<hr style="margin:4px 0px; border-color:#dcdcdc">');
-        content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label" style="padding-top: 6px;">RTC Description:</div><div class="nc-dot-popover-data">' + removeNull(attr.incidentType).replace('Night Time','Nighttime') + ' - DriveNC.gov ' + report.id + '&nbsp;&nbsp;<button type="button" title="Copy short description to clipboard" class="btn-dot btn-dot-secondary btn-copy-description" data-dot-reportid="' + report.id + '" style="margin-left:6px;"><span class="fa fa-copy" /></button></div></div>');
+        content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label" style="padding-top: 6px;">RTC Description:</div><div class="nc-dot-popover-data"><div style="display:inline-block;padding-top: 6px;">' + removeNull(attr.incidentType).replace('Night Time','Nighttime').replace('Other',report.attributes.condition) + ' - DriveNC.gov ' + report.id + '&nbsp;&nbsp;</div><button type="button" title="Copy short description to clipboard" class="btn-dot btn-dot-secondary btn-copy-description" data-dot-reportid="' + report.id + '" style="margin-left:6px;"><span class="fa fa-copy" /></button></div></div>');
         if (TIMSadmin) {
-            content.push('<hr style="margin:5px 0px; border-color:#dcdcdc"><div style="display:table;width:100%"><button type="button" class="btn-dot btn-dot-primary btn-open-dot-report" data-dot-report-url="' + adminUrl + report.id + '" style="float:left;">TIMS Admin <span class="fa fa-external-link" /></button><button type="button" title="Copy TIMS Admin URL to clipboard" class="btn-dot btn-dot-secondary btn-copy-report-url" data-dot-reporturl="' + adminUrl + report.id + '" style="float:left;margin-left:6px;"><span class="fa fa-copy" /> URL</button>');
+            content.push('<hr style="margin:5px 0px; border-color:#dcdcdc"><div style="display:table;width:100%"><button type="button" class="btn-dot btn-dot-primary btn-open-dot-report" data-dot-report-url="' + adminUrl + report.id + '" style="float:left;">TIMS Admin <span class="fa fa-external-link" /></button><button type="button" title="Copy TIMS Admin URL to clipboard" class="btn-dot btn-dot-secondary btn-copy-report-url" data-dot-reporturl="' + adminUrl + report.id + '" style="float:left;margin-left:6px;"><span class="fa fa-copy"></span> URL</button>');
         } else {
-            content.push('<hr style="margin:5px 0px; border-color:#dcdcdc"><div style="display:table;width:100%"><button type="button" class="btn-dot btn-dot-primary btn-open-dot-report" data-dot-report-url="' + detailsUrl + report.id + '" style="float:left;">DriveNC.gov <span class="fa fa-external-link" /></button><button type="button" title="Copy DriveNC URL to clipboard" class="btn-dot btn-dot-secondary btn-copy-report-url" data-dot-reporturl="' + detailsUrl + report.id + '" style="float:left;margin-left:6px;"><span class="fa fa-copy" /> URL</button>');
+            content.push('<hr style="margin:5px 0px; border-color:#dcdcdc"><div style="display:table;width:100%"><button type="button" class="btn-dot btn-dot-primary btn-open-dot-report" data-dot-report-url="' + detailsUrl + report.id + '" style="float:left;">DriveNC.gov <span class="fa fa-external-link" /></button><button type="button" title="Copy DriveNC URL to clipboard" class="btn-dot btn-dot-secondary btn-copy-report-url" data-dot-reporturl="' + detailsUrl + report.id + '" style="float:left;margin-left:6px;"><span class="fa fa-copy"></span> URL</button>');
         }
         content.push('<button type="button" style="float:right;" class="btn-dot btn-dot-primary btn-archive-dot-report" data-dot-report-id="' + report.id + '">Archive</button></div>');
 
@@ -674,7 +679,7 @@
             if (_rank >= 3) {
                 content.push('<button type="button" title="Push to NC Closures Sheet as Closed" class="btn-dot btn-dot-secondary btn-push-to-sheet" data-dot-reportid="' + report.id + '" data-dot-status="Closed"><span class="" />Post to Sheet - Closed</button>');
             }
-            content.push('<button type="button" style="float:right;" title="Copy WME Closure Helper string to clipboard" class="btn-dot btn-dot-secondary btn-copy-helper-string" data-dot-reportid="' + report.id + '"><span class="fa fa-copy" /> CH</button></div>');
+            content.push('<button type="button" style="float:right;" title="Copy WME Closure Helper string to clipboard" class="btn-dot btn-dot-secondary btn-copy-helper-string" data-dot-reportid="' + report.id + '"><span class="fa fa-copy"></span> CH</button></div>');
         }
         content.push('</div></div>');
 
@@ -689,7 +694,7 @@
         if (report.archived) { $imageDiv.addClass('nc-dot-archived-marker'); }
         report.imageDiv = $imageDiv;
         report.marker = marker;
-        report.title = attr.condition;
+        report.title = report.id + " - " + attr.condition;
         report.width = "500px";
         report.content = content.join('');
     }
@@ -715,6 +720,29 @@
         $(".close-popover").click(function() {
             toggleReportPopover(rpt.imageDiv);
         });
+
+		// Add incident polyline to map
+		let hidePoly = $('#settingsHidePoly').is(':checked');
+        if (hidePoly == false) {
+            let poly = JSON.parse(rpt.attributes.polyline);
+            const pointList = [];
+            poly.coordinates.forEach(point => pointList.push(new OpenLayers.Geometry.Point(point[0],
+                                                                                           point[1]).transform(
+                new OpenLayers.Projection("EPSG:4326"),
+                W.map.getProjectionObject()
+            ),));
+            let lineString = new OpenLayers.Geometry.LineString(pointList);
+            const color = "#FF6F61";
+            const features = [];
+            const vector = new OpenLayers.Feature.Vector(lineString, {
+                strokeWidth: 15,//getStrokeWidth,
+                strokeDashstyle: 'solid',
+                zIndex: 334,
+                color
+            });
+            features.push(vector);
+            _polyLayer.addFeatures(features);
+        }
     }
 
     // dragElement from https://www.w3schools.com/howto/howto_js_draggable.asp
@@ -802,10 +830,10 @@
     function processReports(reports, showPopupWhenDone) {
         let reportIDs = {};
         _reportsClosures = [];
-        //_reportsClearedOrLanes = [];
         _cameras = [];
         _mapLayer.clearMarkers();
         _cameraLayer.clearMarkers();
+		_polyLayer.removeAllFeatures();
         fetchCameras();
         logDebug('Processing ' + reports.length + ' reports...');
         let conditionFilter = [
@@ -818,14 +846,6 @@
             'Road Closed with Detour',
             'Road Impassable'
         ];
-        let conditionFilter2 = [
-            'Lane Closed',
-            'Lanes Closed',
-            'Moving Closure',
-            'Congestion',
-            'Shoulder Closed',
-            'Cleared'
-        ];
         reports.forEach(function(reportDetails) {
             if (!reportIDs.hasOwnProperty(reportDetails.id)) {
                 console.log(reportDetails)
@@ -834,7 +854,11 @@
                 report.id = reportDetails.id;
                 report.attributes = reportDetails;
                 if (conditionFilter.indexOf(report.attributes.condition) > -1) {
-                    report.attributes.roadFullName = report.attributes.road + (report.attributes.commonName && (report.attributes.commonName !== report.attributes.road) ? '  (' + report.attributes.commonName + ')' : '');
+					if (report.attributes.road.substring(0,3) == 'SR-') {
+						report.attributes.roadFullName = report.attributes.commonName + (report.attributes.commonName !== report.attributes.road ? ' (' + report.attributes.road.trim() + ')' : '');
+					} else {
+						report.attributes.roadFullName = report.attributes.road + (report.attributes.commonName && (report.attributes.commonName !== report.attributes.road) ? ' (' + report.attributes.commonName + ')' : '');
+					}
                     report.archived = false;
                     if (_settings.archivedReports.hasOwnProperty(report.id)) {
                         if ( _settings.archivedReports[report.id].lastUpdated != report.attributes.lastUpdate) {
@@ -845,19 +869,6 @@
                     }
                     addReportToMap(report);
                     _reportsClosures.push(report);
-                }
-                if (conditionFilter2.indexOf(report.attributes.Condition) > -1) {
-                    report.attributes.roadFullName = report.attributes.road + (report.attributes.commonName && (report.attributes.commonName !== report.attributes.road) ? '  (' + report.attributes.commonName + ')' : '');
-                    report.archived = false;
-                    if (_settings.archivedReports.hasOwnProperty(report.id)) {
-                        if ( _settings.archivedReports[report.id].lastUpdated != report.attributes.lastUpdate) {
-                            delete _settings.archivedReports[report.id];
-                        } else {
-                            report.archived = true;
-                        }
-                    }
-                    //addReportToMap(report);
-                    //_reportsClearedOrLanes.push(report);
                 }
             }
         });
@@ -914,7 +925,8 @@
                     let cameraImgUrl = report.imageURL;
                     let cameraContent = [];
                     cameraContent.push('<img id="camera-img-'+ report.id +'" src=' + cameraImgUrl + '&t=' + new Date().getTime() + ' style="max-width:352px">');
-                    cameraContent.push('<div><hr style="margin:5px 0px;border-color:#dcdcdc"><div style="display:table;width:100%"><button type="button" class="btn-dot btn-dot-primary btn-open-camera-img" data-camera-img-url="' + cameraImgUrl + '" style="float:left;">Open Image Full-Size</button><button type="button" class="btn-dot btn-dot-primary btn-refresh-camera-img" data-camera-img-url="' + cameraImgUrl + '" style="float:right;"><span class="fa fa-refresh" /></button></div></div>');
+                    //temp removed below until both full-size and refresh buttons can be fixed 2.12.23
+					//cameraContent.push('<div><hr style="margin:5px 0px;border-color:#dcdcdc"><div style="display:table;width:100%"><button type="button" class="btn-dot btn-dot-primary btn-open-camera-img" data-camera-img-url="' + cameraImgUrl + '" style="float:left;">Open Image Full-Size</button><button type="button" class="btn-dot btn-dot-primary btn-refresh-camera-img" data-camera-img-url="' + cameraImgUrl + '" style="float:right;"><span class="fa fa-refresh" /></button></div></div>');
                     report.content = cameraContent.join('');
                     report.title = report.displayName;
                     report.width = "370px";
@@ -1012,11 +1024,29 @@
 
     function init511ReportsOverlay(){
         installIcon();
+		const POLY_STYLE = {
+			strokeColor: '#FF6F61',
+			strokeDashstyle: 'solid',
+			strokeWidth: '15'
+		};
         _mapLayer = new OpenLayers.Layer.Markers("NCDOT Reports", { uniqueName: "__ncDotReports" });
         W.map.addLayer(_mapLayer);
         _mapLayer.setVisibility(_settings.ncdotLayerVisible);
         _mapLayer.setZIndex(10000);
-        WazeWrap.Interface.AddLayerCheckbox('Display', 'NCDOT Reports', _settings.ncdotLayerVisible, onReportsLayerCheckboxChanged); // Add the layer checkbox to the Layers menu
+        WazeWrap.Interface.AddLayerCheckbox('Display', 'NCDOT Reports', _settings.ncdotLayerVisible, onReportsLayerCheckboxChanged);
+
+        _polyLayer = new OpenLayers.Layer.Vector("NCDOT Report Polylines", { uniqueName: "__ncDotReportPolylines",
+            styleMap: new OpenLayers.StyleMap({ default: POLY_STYLE })
+			});
+        W.map.addLayer(_polyLayer);
+        let hidePoly = $('#settingsHidePoly').is(':checked');
+        _polyLayer.setVisibility(((_settings.ncdotLayerVisible && hidePoly == false) ? true : false));
+		// W.map.setLayerIndex(_polyLayer, W.map.getLayerIndex(W.map.roadLayers[0])-2);
+        // HACK to get around conflict with URO+.  If URO+ is fixed, this can be replaced with the setLayerIndex line above.
+        _polyLayer.setZIndex(334);
+        const checkLayerZIndex = () => { if (_polyLayer.getZIndex() !== 334) _polyLayer.setZIndex(334); };
+        setInterval(() => { checkLayerZIndex(); }, 100);
+		// END HACK
 
         _cameraLayer = new OpenLayers.Layer.Markers("NCDOT Cameras", { uniqueName: "__ncDotCameras" });
         W.map.addLayer(_cameraLayer);
@@ -1030,6 +1060,8 @@
 
     function onReportsLayerCheckboxChanged(checked) {
         _mapLayer.setVisibility(checked);
+        let hidePoly = $('#settingsHidePoly').is(':checked');
+        _polyLayer.setVisibility(((checked && hidePoly == false) ? true : false));
         checked = document.querySelector('#layer-switcher-item_ncdot_reports').checked
         _settings.ncdotLayerVisible = checked;
         saveSettingsToStorage();
@@ -1107,9 +1139,6 @@
             $('<ul>', {id:'ncdot-tabs', class:'nav nav-tabs'}).append(
                 $('<li>',{class:'active'}).append(
                     $('<a>',{id:'ncdot-tabstitle-closures',href:'#ncdot-tabs-closures','data-toggle':'tab'}).text('Closures')
-                    //),
-                    //$('<li>').append(
-                    //    $('<a>',{id:'ncdot-tabstitle-cleared',href:'#ncdot-tabs-cleared','data-toggle':'tab'}).text('Cleared')
                 ),
                 $('<li>').append(
                     $('<a>',{id:'ncdot-tabstitle-settings',href:'#ncdot-tabs-settings','data-toggle':'tab'}).text('Settings')
@@ -1207,7 +1236,10 @@
                     .append($('<label>', {for:'settingsCopyPL'}).text('Copy Permalink when archiving report')),
                     $('<div>',{class:'controls-container'})
                     .append($('<input>', {type:'checkbox',name:'settingsAutoOpenClosures',id:'settingsAutoOpenClosures'}))
-                    .append($('<label>', {for:'settingsAutoOpenClosures'}).html('Auto open Closures tab on segments<br /><em>(keyboard shortcut; default: Alt+Shift+C)</em>'))
+                    .append($('<label>', {for:'settingsAutoOpenClosures'}).html('Auto open Closures tab on segments<br /><em>(keyboard shortcut; default: Alt+Shift+C)</em>')),
+                    $('<div>',{class:'controls-container'})
+                    .append($('<input>', {type:'checkbox',name:'settingsHidePoly',id:'settingsHidePoly'}))
+                    .append($('<label>', {for:'settingsHidePoly'}).html('Hide DriveNC incident polylines from NCDOT Reports layer'))
                 ),
                 $('<div>',{id:'ncdot-tabs-sm',class:'tab-pane'}).append(
                     $('<div>', {id:'sm-active-closures'}).append(
@@ -1227,7 +1259,7 @@
             )
         );
         restoreUserTab();
-        if (_user === 's18slider' || _user === 'the_cre8r' || _user === 'hiroaki27609' || _user === 'dfortney' || _user === 'dclemur' || _user === 'abelter') {
+        if (_user === 's18slider' || _user === 'the_cre8r' || _user === 'hiroaki27609' || _user === 'dfortney' || _user === 'abelter') {
             $('#ncdot-tabstitle-sm').show();
         }
         if (_user === 'abelter') {
@@ -1239,8 +1271,8 @@
                 if (_settings[settingProps[i]]) { $('#' + checkboxIds[i]).attr('checked', 'checked'); }
             }
             $('#settingsHideNCDotXDaysNumber').attr('value', _settings.hideXDaysNumber)
-        })(['showCityCountyCheck','hideLocated','hideJump','copyPL','copyDescription','autoOpenClosures','hideArchivedReports','hideAllButWeatherReports', 'secureSite','hideInterstatesReports','hideUSHighwaysReports','hideNCHighwaysReports','hideSRHighwaysReports','hideXDaysReports','hideXDaysNumber'],
-           ['settingsShowCityCounty','settingsHideLocated','settingsHideJump','settingsCopyPL','settingsCopyDescription','settingsAutoOpenClosures','settingsHideNCDotArchivedReports','settingsHideNCDotAllButWeatherReports', 'secureSite','settingsHideNCDotInterstatesReports','settingsHideNCDotUSHighwaysReports','settingsHideNCDotNCHighwaysReports','settingsHideNCDotSRHighwaysReports','settingsHideNCDotXDaysReports','settingsHideNCDotXDaysNumber']);
+        })(['showCityCountyCheck','hideLocated','hideJump','copyPL','copyDescription','autoOpenClosures','hidePoly','hideArchivedReports','hideAllButWeatherReports', 'secureSite','hideInterstatesReports','hideUSHighwaysReports','hideNCHighwaysReports','hideSRHighwaysReports','hideXDaysReports','hideXDaysNumber'],
+           ['settingsShowCityCounty','settingsHideLocated','settingsHideJump','settingsCopyPL','settingsCopyDescription','settingsAutoOpenClosures','settingsHidePoly','settingsHideNCDotArchivedReports','settingsHideNCDotAllButWeatherReports', 'secureSite','settingsHideNCDotInterstatesReports','settingsHideNCDotUSHighwaysReports','settingsHideNCDotNCHighwaysReports','settingsHideNCDotSRHighwaysReports','settingsHideNCDotXDaysReports','settingsHideNCDotXDaysNumber']);
     }
 
     function initGui() {
@@ -1263,16 +1295,16 @@
             '#nc-dot-version {font-size:11px;margin-left:10px;color:#aaa;}',
             '.tooltip.top > .tooltip-arrow {border-top-color:white;} ',
             '.tooltip.bottom > .tooltip-arrow {border-bottom-color:white;} ',
-            'a.close-popover {text-decoration:none;padding:0px 10px;border-radius:20px;border-width:0px;background-color:rgb(242, 243, 244);color: rgb(0, 164, 235);} a.close-popover:hover {background-color:rgb(234, 241, 246);} ',
+            '.close-popover {text-decoration:none;padding:0px 10px;border-radius:20px;border-width:0px;background-color:rgb(255, 255, 255);color: rgb(0, 164, 235);cursor:pointer;} .close-popover:hover {background-color:rgb(234, 241, 246);} ',
             '#nc-dot-refresh-popup {position:absolute;z-index:9999;top:80px;left:650px;background-color:rgb(120,176,191);e;font-size:120%;padding:3px 11px;box-shadow:6px 8px rgba(20,20,20,0.6);border-radius:5px;color:white;} ',
             '.refreshIcon:hover {color:#00a4eb} .refreshIcon:active{ text-shadow: 0px 0px; }',
             '.nc-dot-archived-marker {opacity:0.5;} ',
             '.nc-dot-table-label {font-size:85%;} .nc-dot-table-action:hover {color:#00a4eb;cursor:pointer} .nc-dot-table-label.right {float:right} .nc-dot-table-label.count {margin-left:4px;}',
             '.reportPop {display: block; position: absolute; width: 500px;left: 30%;top: 35%;background: #fff;display: none;}',
-            '.pop-title {background: #efefef;border: #ddd solid 1px;position: relative;display: block;}',
+            '.pop-title {background: #efefef;border: #ddd solid 1px;position: relative;display: block;cursor:all-scroll;padding: 5px 10px;}',
             '.pop-content {display: block;font-family: sans-serif;padding: 5px 10px;}',
             '.nc-dot-popover-cont {display: flex;}',
-            '.nc-dot-popover-label {font-weight:bold; width: 115px; display: inline-block;}',
+            '.nc-dot-popover-label {font-weight:bold; width: 125px; display: inline-block;}',
             '.nc-dot-popover-data {flex: 1;}',
             '.monospace {font-family:monospace !important;}',
             '.btn-dot { display:inline-block; align-items: center; font-family: Gotham-Rounded, Rubik, sans-serif; font-size: 12px; font-weight: 500;height: 28px;justify-content: center;line-height: 14px;min-width: 48px;text-align: center;user-select: none;white-space: nowrap; border-width: 1px; border-style: solid; border-color: transparent;border-image: initial;border-radius: 20px;outline: none;padding: 0px 16px;}',
@@ -1289,6 +1321,7 @@
             '#tims-id-label {font-family: "Rubik", "Helvetica Neue", Helvetica, "Open Sans", sans-serif; font-size: 11px; width: 100%; color: #354148;}',
             '#sidepanel-ncdot .tab-pane { padding: 1px !important; }',
             '#ncdot-tab-content { padding: 1px !important; }',
+			'#ncdot-tab-content > .tab-pane {width: 295px !important;}',
             '#ncdot-tab-content .controls-container > label { word-break: break-word; white-space: normal !important; }',
             '.layer-switcher ul[class^="collapsible"] { max-height: none; }'
         ].join('');
@@ -1315,12 +1348,13 @@
                 lastVersion:null,
                 ncdotLayerVisible:true,
                 ncdotCameraVisible:true,
-                showCityCountyCheck:true,
+                showCityCountyCheck:false,
                 hideLocated:false,
                 hideJump:false,
                 copyPL:true,
-                copyDescription:false,
+                copyDescription:true,
                 autoOpenClosures:false,
+				hidePoly:false,
                 hideArchivedReports:true,
                 hideAllButWeatherReports:false,
                 hideInterstatesReports:false,
