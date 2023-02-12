@@ -77,6 +77,7 @@ https://github.com/TheCre8r/WME-NCDOT-Reports/raw/master/WME-NCDOT-Reports.user.
 * **Mapomatic** - *Initial work and feature requests*
 * **The_Cre8r** - *Compatibility updates*
 * **ABelter** - *Compatibility updates and new features*
+* **dalverson** - *Compatibility updates*
 
 
 ## License
