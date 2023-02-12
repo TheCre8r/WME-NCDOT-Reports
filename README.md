@@ -2,11 +2,11 @@
 
 ## Synopsis
 
-This script quickly locates active closures published by NCDOT on North Carolina state-maintained roads. Active closures are retrieved from NCDOT and can be sorted by road name, description, start time and end time. Clicking on a row takes you to the approximate location of the closure.
+This script quickly locates active closures published by NCDOT on North Carolina state-maintained roads. Active closures are retrieved from NCDOT and can be sorted by road name, description, start time and end time. Clicking on a row takes you to the approximate location of the closure, and shows the portion of road closed, as drawn by the closure submitter.
 
 NCDOT closures feed can be refreshed, pulling in the latest closures, using the “Refresh” icon. Additionally, there is a convenient “Archive” feature to archive any closures that have been reviewed.	
 
-![Screenshot](https://upload.wikimedia.org/wikipedia/commons/thumb/a/ac/No_image_available.svg/240px-No_image_available.svg.png)
+![Screenshot](https://raw.githubusercontent.com/abelter/WME-NCDOT-Reports/master/ncdot-reports-screenshot.png)
 
 ## Version History
 
@@ -26,7 +26,6 @@ v 2020.04.27
 - Updated all incident times to 24hr format
 - Updated incident links and descriptions to DriveNC.gov
 - Fixed camera image sizes + added link to view full-size
-
 
 v 2020.06.07
 - Added option to show City and County in description column; when enabled, this column becomes sortable by City name
@@ -59,6 +58,15 @@ v 2021.11.06
 v 2022.02.04
 - Compatability with the new NCDOT API
 
+v 2022.07.26
+- Fixed popup windows, made draggable
+
+v 2023.02.12
+- NEW: Polylines added to DriveNC incidents will now show in WME, to indicate the portion of road that's closed (can be disabled in settings)
+- Quality-of-life improvements and consistency with our recent NC Closures Sheet and Discord updates: show a road's common name first if it's an SR, replace "other" in the RTC Descriptions, copy beta WME PLs as prod WME, fix column widths due to WME changes
+- Cleaned up code for features that now live in the Closures Sheet and Discord (namely alerting when incidents clear early)
+- Removed broken camera refresh and open full size links until they can be fixed
+
 ## Installation
 
 Install just like any other userscript by clicking this link:
@@ -68,7 +76,6 @@ https://github.com/TheCre8r/WME-NCDOT-Reports/raw/master/WME-NCDOT-Reports.user.
 
 * **Mapomatic** - *Initial work and feature requests*
 * **The_Cre8r** - *Compatibility updates*
-
 * **ABelter** - *Compatibility updates and new features*
 
 
