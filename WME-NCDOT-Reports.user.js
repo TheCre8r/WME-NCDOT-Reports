@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME NCDOT Reports
 // @namespace    https://greasyfork.org/users/45389
-// @version      2023.02.12.01
+// @version      2024.06.13.01
 // @description  Display NC transportation department reports in WME.
 // @author       MapOMatic, The_Cre8r, and ABelter
 // @license      GNU GPLv3
@@ -701,7 +701,7 @@
 
     function showPopup(rpt)
     {
-        var popHtml = '<div id="ncPopup" class="reportPop popup" style="max-width:' + rpt.width + ';width:' + rpt.width + ';">' +
+        var popHtml = '<div id="ncPopup" class="reportPop popup" style="max-width:' + rpt.width + ';width:' + rpt.width + ';z-index: 1000;">' +
             '<div class="arrow"></div>' +
             '<div class="pop-title " id="pop-drag">' + rpt.title + '<div style="float:right;"><div class="close-popover">X</div></div></div>' +
             '<div class="pop-content">' + rpt.content + '</div>' +
@@ -848,7 +848,7 @@
         ];
         reports.forEach(function(reportDetails) {
             if (!reportIDs.hasOwnProperty(reportDetails.id)) {
-                console.log(reportDetails)
+                //console.log(reportDetails)
                 reportIDs[reportDetails.id] = reportDetails.id;
                 let report = {};
                 report.id = reportDetails.id;
