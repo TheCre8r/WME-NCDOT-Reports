@@ -71,7 +71,7 @@ v 2024.06.13.01
 - Fixed incident pop-ups
 
 v 2024.06.16.01
--Fixed polylines to show above satellite and additional imagery layers
+- Fixed polylines to show above satellite and additional imagery layers
 
 ## Installation
 
