@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME NCDOT Reports
 // @namespace    https://greasyfork.org/users/45389
-// @version      2024.06.16.01
+// @version      2024.06.16.02
 // @description  Display NC transportation department reports in WME.
 // @author       MapOMatic, The_Cre8r, and ABelter
 // @license      GNU GPLv3
@@ -33,8 +33,8 @@
     const UPDATE_ALERT = true;
     const SCRIPT_CHANGES = [
         '<ul>',
-        '<li>2024.06.16.01: Fixed polylines to show above satellite and additional imagery layers</li>',
-        '<li>2024.06.13.01: Fixed incident pop-ups</li>',
+        '<li>2024.06.16: Fixed polylines to show above satellite and additional imagery layers</li>',
+        '<li>2024.06.13: Fixed incident pop-ups</li>',
         '</ul>'
     ].join('\n');
 
@@ -735,7 +735,7 @@
             const vector = new OpenLayers.Feature.Vector(lineString, {
                 strokeWidth: 15,//getStrokeWidth,
                 strokeDashstyle: 'solid',
-                zIndex: 341,
+                zIndex: 376,
                 color
             });
             features.push(vector);
@@ -1041,8 +1041,8 @@
         _polyLayer.setVisibility(((_settings.ncdotLayerVisible && hidePoly == false) ? true : false));
 		// W.map.setLayerIndex(_polyLayer, W.map.getLayerIndex(W.map.roadLayers[0])-2);
         // HACK to get around conflict with URO+.  If URO+ is fixed, this can be replaced with the setLayerIndex line above.
-        _polyLayer.setZIndex(341);
-        const checkLayerZIndex = () => { if (_polyLayer.getZIndex() !== 341) _polyLayer.setZIndex(341); };
+        _polyLayer.setZIndex(376);
+        const checkLayerZIndex = () => { if (_polyLayer.getZIndex() !== 376) _polyLayer.setZIndex(376); };
         setInterval(() => { checkLayerZIndex(); }, 100);
 		// END HACK
 
