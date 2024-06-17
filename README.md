@@ -67,6 +67,12 @@ v 2023.02.12
 - Cleaned up code for features that now live in the Closures Sheet and Discord (namely alerting when incidents clear early)
 - Removed broken camera refresh and open full size links until they can be fixed
 
+v 2024.06.13.01
+- Fixed incident pop-ups
+
+v 2024.06.16.01
+-Fixed polylines to show above satellite and additional imagery layers
+
 ## Installation
 
 Install just like any other userscript by clicking this link:
