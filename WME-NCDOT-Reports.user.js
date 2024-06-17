@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME NCDOT Reports
 // @namespace    https://greasyfork.org/users/45389
-// @version      2024.06.13.01
+// @version      2024.06.16.01
 // @description  Display NC transportation department reports in WME.
 // @author       MapOMatic, The_Cre8r, and ABelter
 // @license      GNU GPLv3
@@ -33,10 +33,8 @@
     const UPDATE_ALERT = true;
     const SCRIPT_CHANGES = [
         '<ul>',
-        '<li>NEW: Polylines added to DriveNC incidents will now show in WME, to indicate the portion of road that\'s closed (can be disabled in settings)</li>',
-        '<li>Quality-of-life improvements and consistency with our recent NC Closures Sheet and Discord updates: show a road\'s common name first if it\'s an SR, replace "other" in the RTC Descriptions, copy beta WME PLs as prod WME, fix column widths due to WME changes</li>',
-        '<li>Cleaned up code for features that now live in the Closures Sheet and Discord (namely alerting when incidents clear early)</li>',
-        '<li>Removed broken camera refresh and open full size links until they can be fixed</li>',
+        '<li>2024.06.16.01: Fixed polylines to show above satellite and additional imagery layers</li>',
+        '<li>2024.06.13.01: Fixed incident pop-ups</li>',
         '</ul>'
     ].join('\n');
 
@@ -737,7 +735,7 @@
             const vector = new OpenLayers.Feature.Vector(lineString, {
                 strokeWidth: 15,//getStrokeWidth,
                 strokeDashstyle: 'solid',
-                zIndex: 334,
+                zIndex: 341,
                 color
             });
             features.push(vector);
@@ -1043,8 +1041,8 @@
         _polyLayer.setVisibility(((_settings.ncdotLayerVisible && hidePoly == false) ? true : false));
 		// W.map.setLayerIndex(_polyLayer, W.map.getLayerIndex(W.map.roadLayers[0])-2);
         // HACK to get around conflict with URO+.  If URO+ is fixed, this can be replaced with the setLayerIndex line above.
-        _polyLayer.setZIndex(334);
-        const checkLayerZIndex = () => { if (_polyLayer.getZIndex() !== 334) _polyLayer.setZIndex(334); };
+        _polyLayer.setZIndex(341);
+        const checkLayerZIndex = () => { if (_polyLayer.getZIndex() !== 341) _polyLayer.setZIndex(341); };
         setInterval(() => { checkLayerZIndex(); }, 100);
 		// END HACK
 
