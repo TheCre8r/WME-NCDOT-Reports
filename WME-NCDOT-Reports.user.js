@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME NCDOT Reports
 // @namespace    https://greasyfork.org/users/45389
-// @version      2024.06.16.02
+// @version      2024.07.11.01
 // @description  Display NC transportation department reports in WME.
 // @author       MapOMatic, The_Cre8r, and ABelter
 // @license      GNU GPLv3
@@ -33,8 +33,7 @@
     const UPDATE_ALERT = true;
     const SCRIPT_CHANGES = [
         '<ul>',
-        '<li>2024.06.16: Fixed polylines to show above satellite and additional imagery layers</li>',
-        '<li>2024.06.13: Fixed incident pop-ups</li>',
+        '<li>2024.07.11: Compatibility with WME update</li>',
         '</ul>'
     ].join('\n');
 
@@ -720,7 +719,8 @@
         });
 
 		// Add incident polyline to map
-		let hidePoly = $('#settingsHidePoly').is(':checked');
+		let poly_zindex = W.map.roadLayer.div.style.zIndex-1;
+        let hidePoly = $('#settingsHidePoly').is(':checked');
         if (hidePoly == false) {
             let poly = JSON.parse(rpt.attributes.polyline);
             const pointList = [];
@@ -735,7 +735,7 @@
             const vector = new OpenLayers.Feature.Vector(lineString, {
                 strokeWidth: 15,//getStrokeWidth,
                 strokeDashstyle: 'solid',
-                zIndex: 376,
+                zIndex: poly_zindex,
                 color
             });
             features.push(vector);
@@ -1041,8 +1041,9 @@
         _polyLayer.setVisibility(((_settings.ncdotLayerVisible && hidePoly == false) ? true : false));
 		// W.map.setLayerIndex(_polyLayer, W.map.getLayerIndex(W.map.roadLayers[0])-2);
         // HACK to get around conflict with URO+.  If URO+ is fixed, this can be replaced with the setLayerIndex line above.
-        _polyLayer.setZIndex(376);
-        const checkLayerZIndex = () => { if (_polyLayer.getZIndex() !== 376) _polyLayer.setZIndex(376); };
+        let poly_zindex = W.map.roadLayer.div.style.zIndex-1;
+        _polyLayer.setZIndex(poly_zindex);
+        const checkLayerZIndex = () => { if (_polyLayer.getZIndex() !== poly_zindex) _polyLayer.setZIndex(poly_zindex); };
         setInterval(() => { checkLayerZIndex(); }, 100);
 		// END HACK
 
