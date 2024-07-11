@@ -73,6 +73,9 @@ v 2024.06.13
 v 2024.06.16
 - Fixed polylines to show above satellite and additional imagery layers
 
+v 2024.07.11
+- Polyline compatibility update with latest WME changes to layers
+
 ## Installation
 
 Install just like any other userscript by clicking this link:
