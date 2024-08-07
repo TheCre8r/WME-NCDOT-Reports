@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME NCDOT Reports
 // @namespace    https://greasyfork.org/users/45389
-// @version      2024.07.11.01
+// @version      2024.08.07.01
 // @description  Display NC transportation department reports in WME.
 // @author       MapOMatic, The_Cre8r, and ABelter
 // @license      GNU GPLv3
@@ -33,7 +33,7 @@
     const UPDATE_ALERT = true;
     const SCRIPT_CHANGES = [
         '<ul>',
-        '<li>2024.07.11: Compatibility with WME update</li>',
+        '<li>2024.08.07: Added display of NCDOT Event Names (e.g. 2024 TS Debby) if information is present on incident</li>',
         '</ul>'
     ].join('\n');
 
@@ -222,7 +222,7 @@
         let timsURL = 'https://drivenc.gov/?type=incident&id=' + id;
         let closureDirection = getReport(id).attributes.direction;
         let permalink = document.querySelector(".WazeControlPermalink .permalink").href;
-        permalink = permalink.replace(/(&s=[0-9]{6,14}&)/,'&');
+        permalink = permalink.replace(/(&s=[0-9]{6,22}&)/,'&');
 
         if (!permalink.includes('segments=')) {
             WazeWrap.Alerts.error(SCRIPT_NAME,"No segments are selected. Please select the closed segment(s) in order to pass the permalink to the Closures Sheet.");
@@ -645,13 +645,11 @@
         let adminUrl = 'https://tims.ncdot.gov/tims/V2/Incident/Details/';
         let TIMSadmin = $('#secureSite').is(':checked');
 
-        let eventLookup = {1:"None", 138:"Hurricane Matthew"};
         let content = [];
         content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Road:</div><div class="nc-dot-popover-data">' + removeNull(attr.roadFullName) + '</div></div>');
         content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">City:</div><div class="nc-dot-popover-data">' + removeNull(attr.city) + '  (' + removeNull(attr.countyName) + ' County)</div></div>');
         content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Location:</div><div class="nc-dot-popover-data">' + removeNull(attr.location) + '</div></div>');
         content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Reason:</div><div class="nc-dot-popover-data">' + removeNull(attr.reason) + '</div></div>');
-        //if (eventLookup.hasOwnProperty(attr.EventID)) { content.push('<span style="font-weight:bold">Event Name:</span>&nbsp;&nbsp;' + eventLookup[attr.EventID] + '<br>'); }
         //content.push('<span style="font-weight:bold">TIMS ID:</span>&nbsp;&nbsp;' + removeNull(attr.Id) + '<br>');
         content.push('<hr style="margin:4px 0px; border-color:#dcdcdc">');
         content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Start Time:</div><div class="nc-dot-popover-data monospace">' + formatDateTimeString(attr.start) + '</div></div>');
@@ -664,6 +662,7 @@
         content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Last Updated:</div><div class="nc-dot-popover-data monospace">' + formatDateTimeString(attr.lastUpdate) + '</div></div>');
         content.push('<hr style="margin:4px 0px; border-color:#dcdcdc">');
         content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label" style="padding-top: 6px;">RTC Description:</div><div class="nc-dot-popover-data"><div style="display:inline-block;padding-top: 6px;">' + removeNull(attr.incidentType).replace('Night Time','Nighttime').replace('Other',report.attributes.condition) + ' - DriveNC.gov ' + report.id + '&nbsp;&nbsp;</div><button type="button" title="Copy short description to clipboard" class="btn-dot btn-dot-secondary btn-copy-description" data-dot-reportid="' + report.id + '" style="margin-left:6px;"><span class="fa fa-copy" /></button></div></div>');
+        if (attr.eventId > 1) { content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">NCDOT Event:</div><div class="nc-dot-popover-data">' + removeNull(attr.event) + '</div></div>'); }
         if (TIMSadmin) {
             content.push('<hr style="margin:5px 0px; border-color:#dcdcdc"><div style="display:table;width:100%"><button type="button" class="btn-dot btn-dot-primary btn-open-dot-report" data-dot-report-url="' + adminUrl + report.id + '" style="float:left;">TIMS Admin <span class="fa fa-external-link" /></button><button type="button" title="Copy TIMS Admin URL to clipboard" class="btn-dot btn-dot-secondary btn-copy-report-url" data-dot-reporturl="' + adminUrl + report.id + '" style="float:left;margin-left:6px;"><span class="fa fa-copy"></span> URL</button>');
         } else {
@@ -671,13 +670,13 @@
         }
         content.push('<button type="button" style="float:right;" class="btn-dot btn-dot-primary btn-archive-dot-report" data-dot-report-id="' + report.id + '">Archive</button></div>');
 
-        if (_user === 'abelter') {
+        /*if (_user === 'abelter') {
             content.push('<div style="display:table;width:100%;margin-top:5px;"><button type="button" id="pushlocated" title="Push to NC Closures Sheet as Located" class="btn-dot btn-dot-secondary btn-push-to-sheet" data-dot-reportid="' + report.id + '" data-dot-status="Located"style="margin-right:6px;"><span class="" />Post to Sheet - Located</button>');
             if (_rank >= 3) {
                 content.push('<button type="button" title="Push to NC Closures Sheet as Closed" class="btn-dot btn-dot-secondary btn-push-to-sheet" data-dot-reportid="' + report.id + '" data-dot-status="Closed"><span class="" />Post to Sheet - Closed</button>');
             }
             content.push('<button type="button" style="float:right;" title="Copy WME Closure Helper string to clipboard" class="btn-dot btn-dot-secondary btn-copy-helper-string" data-dot-reportid="' + report.id + '"><span class="fa fa-copy"></span> CH</button></div>');
-        }
+        }*/
         content.push('</div></div>');
 
         let $imageDiv = $(marker.icon.imageDiv)
@@ -1303,8 +1302,8 @@
             '.pop-title {background: #efefef;border: #ddd solid 1px;position: relative;display: block;cursor:all-scroll;padding: 5px 10px;}',
             '.pop-content {display: block;font-family: sans-serif;padding: 5px 10px;}',
             '.nc-dot-popover-cont {display: flex;}',
-            '.nc-dot-popover-label {font-weight:bold; width: 125px; display: inline-block;}',
-            '.nc-dot-popover-data {flex: 1;}',
+            '.nc-dot-popover-label {font-size:13px; font-weight:bold; width: 125px; display: inline-block;}',
+            '.nc-dot-popover-data {flex: 1; font-size:13px;}',
             '.monospace {font-family:monospace !important;}',
             '.btn-dot { display:inline-block; align-items: center; font-family: Gotham-Rounded, Rubik, sans-serif; font-size: 12px; font-weight: 500;height: 28px;justify-content: center;line-height: 14px;min-width: 48px;text-align: center;user-select: none;white-space: nowrap; border-width: 1px; border-style: solid; border-color: transparent;border-image: initial;border-radius: 20px;outline: none;padding: 0px 16px;}',
             '.btn-dot-primary { background-color: #00a4eb; color: #fff; }',
