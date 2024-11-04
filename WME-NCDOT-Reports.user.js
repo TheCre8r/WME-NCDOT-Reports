@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME NCDOT Reports
 // @namespace    https://greasyfork.org/users/45389
-// @version      2024.08.07.01
+// @version      2024.11.03.01
 // @description  Display NC transportation department reports in WME.
 // @author       MapOMatic, The_Cre8r, and ABelter
 // @license      GNU GPLv3
@@ -33,11 +33,16 @@
     const UPDATE_ALERT = true;
     const SCRIPT_CHANGES = [
         '<ul>',
-        '<li>2024.08.07: Added display of NCDOT Event Names (e.g. 2024 TS Debby) if information is present on incident</li>',
+        '<li>No longer displays duplicate incidents created from concurrent roads. E.g. I-40 and I-85 between Greensboro and Durham will only show the first incident (same logic applied to NC Closures Sheet; note that this only works if the TIMS incident is properly marked as a concurrency)</li>',
+        '<li>Advisory banner added on Truck Closure incidents that they should not be closed in WME</li>',
+        '<li>Fixed PL copier to exclude user layer settings (WME changed length of identifier)</li>',
+        '<li>New feature: Quick access to turn incident and/or camera layers on/off from top of scripts tab (similar to FC Layers and GIS Layers scripts)</li>',
+        '<li>Switch to WME native script tab method</li>',
+        '<li>Other minor updates</li>',
         '</ul>'
     ].join('\n');
 
-    let _imagesPath = 'https://github.com/abelter/WME-NCDOT-Reports/raw/master/';
+    let _imagesPath = 'https://github.com/TheCre8r/WME-NCDOT-Reports/raw/master/';
     let _settings = {};
     let _tabDiv = {}; // stores the user tab div so it can be restored after switching back from Events mode to Default mode
     let _reportsClosures = [];
@@ -218,11 +223,11 @@
         let closeTime = formatTimeString(getReport(id).attributes.start);
         let openDate = formatDateString(getReport(id).attributes.end);
         let openTime = formatTimeString(getReport(id).attributes.end);
-        let closureReason = getReport(id).attributes.incidentType.replace('Other',report.attributes.condition) + ' - ' + getReport(id).attributes.reason;
+        let closureReason = getReport(id).attributes.incidentType.replace('Other',getReport(id).attributes.condition) + ' - ' + getReport(id).attributes.reason;
         let timsURL = 'https://drivenc.gov/?type=incident&id=' + id;
         let closureDirection = getReport(id).attributes.direction;
         let permalink = document.querySelector(".WazeControlPermalink .permalink").href;
-        permalink = permalink.replace(/(&s=[0-9]{6,22}&)/,'&');
+        permalink = permalink.replace(/(&s=[0-9]{6,30}&)/,'&');
 
         if (!permalink.includes('segments=')) {
             WazeWrap.Alerts.error(SCRIPT_NAME,"No segments are selected. Please select the closed segment(s) in order to pass the permalink to the Closures Sheet.");
@@ -282,7 +287,7 @@
 
         // Fire off the request to /form.php
         request = $.ajax({
-            url: "https://script.google.com/macros/s/AKfycbzOsdgMMbdf3IC-foOfG6IgUI9Xtyopi4wu-DhKBK8o5XF8t2VS/exec",
+            url: "https://script.google.com/macros/s/AKfycby2eH4WGrP3CPL1YEb2g58q49HeB_tch14Ixkrcy6wTwIiJoeCi/exec",
             type: "post",
             data: serializedData
         });
@@ -470,7 +475,7 @@
             let copyLink = $('#settingsCopyPL').is(':checked');
             if (singleArchive && copyLink) {
                 let permalink = document.querySelector(".WazeControlPermalink .permalink").href;
-                permalink = permalink.replace(/(&s=[0-9]{6,14}&)/,'&').replace('beta','www');
+                permalink = permalink.replace(/(&s=[0-9]{6,30}&)/,'&').replace('beta','www');
 
                 if (!permalink.includes('segments=')) {
                     WazeWrap.Alerts.error(SCRIPT_NAME,"No segments were selected. Permalink was not copied to clipboard.");
@@ -646,6 +651,9 @@
         let TIMSadmin = $('#secureSite').is(':checked');
 
         let content = [];
+        if (attr.incidentType == 'Truck Closure') {
+            content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-banner">Truck Closures should <u>not</u> be added to WME!<br>If added by WazeFeed, please delete the closure.</div></div>');
+        }
         content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Road:</div><div class="nc-dot-popover-data">' + removeNull(attr.roadFullName) + '</div></div>');
         content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">City:</div><div class="nc-dot-popover-data">' + removeNull(attr.city) + '  (' + removeNull(attr.countyName) + ' County)</div></div>');
         content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Location:</div><div class="nc-dot-popover-data">' + removeNull(attr.location) + '</div></div>');
@@ -670,13 +678,13 @@
         }
         content.push('<button type="button" style="float:right;" class="btn-dot btn-dot-primary btn-archive-dot-report" data-dot-report-id="' + report.id + '">Archive</button></div>');
 
-        /*if (_user === 'abelter') {
+        if (_user === 'abelter') {
             content.push('<div style="display:table;width:100%;margin-top:5px;"><button type="button" id="pushlocated" title="Push to NC Closures Sheet as Located" class="btn-dot btn-dot-secondary btn-push-to-sheet" data-dot-reportid="' + report.id + '" data-dot-status="Located"style="margin-right:6px;"><span class="" />Post to Sheet - Located</button>');
             if (_rank >= 3) {
                 content.push('<button type="button" title="Push to NC Closures Sheet as Closed" class="btn-dot btn-dot-secondary btn-push-to-sheet" data-dot-reportid="' + report.id + '" data-dot-status="Closed"><span class="" />Post to Sheet - Closed</button>');
             }
-            content.push('<button type="button" style="float:right;" title="Copy WME Closure Helper string to clipboard" class="btn-dot btn-dot-secondary btn-copy-helper-string" data-dot-reportid="' + report.id + '"><span class="fa fa-copy"></span> CH</button></div>');
-        }*/
+            /*content.push('<button type="button" style="float:right;" title="Copy WME Closure Helper string to clipboard" class="btn-dot btn-dot-secondary btn-copy-helper-string" data-dot-reportid="' + report.id + '"><span class="fa fa-copy"></span> CH</button></div>')*/
+        }
         content.push('</div></div>');
 
         let $imageDiv = $(marker.icon.imageDiv)
@@ -791,8 +799,8 @@
 
     function openClosuresTab() {
         let autoOpenClosures = $('#settingsAutoOpenClosures').is(':checked');
-        if (autoOpenClosures && (W.selectionManager.getSelectedFeatures().length > 0)) {
-            let selFeat = W.selectionManager.getSelectedFeatures();
+        if (autoOpenClosures && (W.selectionManager.getSelectedWMEFeatures().length > 0)) {
+            let selFeat = W.selectionManager.getSelectedWMEFeatures();
             let allSeg = selFeat.every(e => e.model.type == 'segment'); // Check to ensure that all selected objects are segments
             if (allSeg) {
                 setTimeout(() => {
@@ -850,7 +858,7 @@
                 let report = {};
                 report.id = reportDetails.id;
                 report.attributes = reportDetails;
-                if (conditionFilter.indexOf(report.attributes.condition) > -1) {
+                if (conditionFilter.indexOf(report.attributes.condition) > -1 && report.attributes.createdFromConcurrent == false) {
 					if (report.attributes.road.substring(0,3) == 'SR-') {
 						report.attributes.roadFullName = report.attributes.commonName + (report.attributes.commonName !== report.attributes.road ? ' (' + report.attributes.road.trim() + ')' : '');
 					} else {
@@ -947,12 +955,12 @@
                             $('.btn-refresh-camera-img').click(function(evt) {evt.stopPropagation(); document.getElementById('camera-img-'+id).src = $(this).data('cameraImgUrl') + "&t=" + new Date().getTime();});
                             $('.reportPopover,.close-popover').click(function(evt) {
                                 $div.data('state', '');
-                                hidePopup(report);
+                                removePopup(report);
                             });
                             //$(".close-popover").click(function() {hideAllReportPopovers();});
                         } else {
                             $div.data('state', '');
-                            hidePopup(report);
+                            removePopup(report);
                         }
                     })
                     .data('cameraId', report.id)
@@ -1029,6 +1037,8 @@
         _mapLayer = new OpenLayers.Layer.Markers("NCDOT Reports", { uniqueName: "__ncDotReports" });
         W.map.addLayer(_mapLayer);
         _mapLayer.setVisibility(_settings.ncdotLayerVisible);
+        _mapLayer.displayInLayerSwitcher = true;
+        _mapLayer.events.register('visibilitychanged', null, onReportsLayerVisibilityChanged);
         _mapLayer.setZIndex(10000);
         WazeWrap.Interface.AddLayerCheckbox('Display', 'NCDOT Reports', _settings.ncdotLayerVisible, onReportsLayerCheckboxChanged);
 
@@ -1049,27 +1059,51 @@
         _cameraLayer = new OpenLayers.Layer.Markers("NCDOT Cameras", { uniqueName: "__ncDotCameras" });
         W.map.addLayer(_cameraLayer);
         _cameraLayer.setVisibility(_settings.ncdotCameraVisible);
+        _cameraLayer.displayInLayerSwitcher = true;
+        _cameraLayer.events.register('visibilitychanged', null, onCamerasLayerVisibilityChanged);
         _cameraLayer.setZIndex(10000);
-        WazeWrap.Interface.AddLayerCheckbox('Display', 'NCDOT Cameras', _settings.ncdotCameraVisible, onCameraLayerCheckboxChanged); // Add the layer checkbox to the Layers menu
+        WazeWrap.Interface.AddLayerCheckbox('Display', 'NCDOT Cameras', _settings.ncdotCameraVisible, onCamerasLayerCheckboxChanged); // Add the layer checkbox to the Layers menu
 
         // initialize keyboard shortcut for auto opening closure tab
         new WazeWrap.Interface.Shortcut('NCDOTOpenClosuresTab', 'Auto open Closures tab on segments', 'ncdot', 'NCDOT Reports', 'SA+c', toggleAutoOpen, null).add();
     }
 
-    function onReportsLayerCheckboxChanged(checked) {
-        _mapLayer.setVisibility(checked);
+    function setEnabled(value) {
+        _mapLayer.setVisibility(value);
         let hidePoly = $('#settingsHidePoly').is(':checked');
-        _polyLayer.setVisibility(((checked && hidePoly == false) ? true : false));
-        checked = document.querySelector('#layer-switcher-item_ncdot_reports').checked
-        _settings.ncdotLayerVisible = checked;
+        _polyLayer.setVisibility(((value && hidePoly == false) ? true : false));
+        $('#layer-switcher-item_ncdot_reports').prop('checked', value);
+        _settings.ncdotLayerVisible = value;
+        const color = value ? '#00bd00' : '#ccc';
+        $('span#ncdot-power-btn').css('color', color);
+        console.log(color);
         saveSettingsToStorage();
     }
 
-    function onCameraLayerCheckboxChanged(checked) {
-        _cameraLayer.setVisibility(checked);
-        checked = document.querySelector('#layer-switcher-item_ncdot_cameras').checked
-        _settings.ncdotCameraVisible = checked;
+    function setEnabledCam(value) {
+        _cameraLayer.setVisibility(value);
+        $('#layer-switcher-item_ncdot_cameras').prop('checked', value);
+        _settings.ncdotCameraVisible = value;
+        const colorCam = value ? '#00bd00' : '#ccc';
+        $('span#ncdot-power-btn-cams').css('color', colorCam);
+        console.log(colorCam);
         saveSettingsToStorage();
+    }
+
+    function onReportsLayerCheckboxChanged(checked) {
+        setEnabled(checked)
+    }
+
+    function onReportsLayerVisibilityChanged() {
+        setEnabled(_mapLayer.visibility);
+    }
+
+    function onCamerasLayerCheckboxChanged(checked) {
+        setEnabledCam(checked)
+    }
+
+    function onCamerasLayerVisibilityChanged() {
+        setEnabledCam(_cameraLayer.visibility);
     }
 
     function onTimsIdGoClick() {
@@ -1090,8 +1124,8 @@
     }
 
     function restoreUserTab() {
-        $('#user-tabs > .nav-tabs').append(_tabDiv.tab);
-        $('#user-info > .flex-parent > .tab-content').append(_tabDiv.panel);
+        //$('#user-tabs > .nav-tabs').append(_tabDiv.tab);
+        //$('#user-info > .flex-parent > .tab-content').append(_tabDiv.panel);
         $('[id^=settings]').change(function(){
             saveSettingsToStorage();
             updateReportsVisibility();
@@ -1121,12 +1155,9 @@
         }
     }
 
-    function initUserPanel() {
-        _tabDiv.tab = $('<li>').append(
-            $('<a>', {'data-toggle':'tab', href:'#sidepanel-ncdot', style:'height:auto;'}).html('<img style="max-width:25px;" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADwAAAAYCAYAAACmwZ5SAAACwUlEQVRYR82YOWhUURSGv3/iLq6oRQgiFiKSKmoQEUGbiEEbca1SWIiIS2ejjQvYaCFiKSgqQQuX4K4ImkIULVQQ7AQXEjWLoOJyjxy5kUckk/dm5k1m4DJ35p17zv/d9dwnKvfZLmmrmX0GvHwCAvAT+A78Ar4CH4D3sXjdnxWAuliSdf9vqGdKSB+qnqR7BfQnDctFPydpc7lO8mpvZkeAvZUAbpJ0DFiel9gK+X1rZg2lAnu70cAPSc+BxgqJysuNL5s6M2vMAjwK2AB0FgqFQ2bm0/cbMDEvlWX6/Q28MLP9wG3Af49PDSypG5gB9AFTyhSTd/M+SSdCCG/iZunxfMB60wC7zW5JR/NWWQX/PcWApwI7JO0BpldBTDVCdCeBxwLbHE7SYqAlnoHVEFKVGGZ2IAncJulUVSKPQBBJ7SGELQ48AWiQdB2YOwJaKhnSzOwe8ExSE7AImCTpdAihzQM5cIek1oxRewBf42k2vYyuK2Lu4LuA48AsoGvAqyS9BBakCPPUzM4Dj4CHMfGoB2YD/u1HlZ/JY+KsmS9pfQq/uZiY2SagfbBzHyEfKU/Qx0XBk4GZEcCf9QJ34mUgkzhJF4F1mRpVwNj3ohCC584+GI8jw1/PeU/JOZI64wyoAEoqFw8kvTOzjW5tZvuAg/+mdCoX5Rn5pWJJnEH1kuYBXnwZ5N3hHWa2Jik/74DFusqXkZ/9qyWdjfVyutbi5uRL08trM1voF5xaAU7qaJV0wZP7Eonvm9nheEko6mIkR3iwsBZJ1zJmd/1mthM4E9+uDNtftQTsYldKupLyytllZst86g5LmTCoNWCXtkLSZc+QioA8MTPP9f3dWaZPLQI7wFJJd+Pm8x+Qma0FrmYijca1CuzymiXdAKYlwczsJrCqFNhqJB6l6hpo11woFE6GEL7EI+cjcAm4VarjP70usQeYszuIAAAAAElFTkSuQmCC" />')
-        );
-
-        _tabDiv.panel = $('<div>', {class:'tab-pane', id:'sidepanel-ncdot'}).append(
+    async function initUserPanel() {
+        const { user } = W.loginManager;
+            const content = $('<div>').append(
             $('<div>', {id:'nc-dot-header'}).append(
                 $('<span>', {id:'nc-dot-title'}).text(SCRIPT_NAME),
                 $('<span>', {id:'nc-dot-version'}).text(SCRIPT_VERSION)
@@ -1255,9 +1286,44 @@
                     )
                 )
             )
-        );
+        ).html();
+
+            const powerButtonColor = _settings.ncdotLayerVisible ? '#00bd00' : '#ccc';
+            const powerButtonColorCam = _settings.ncdotCameraVisible ? '#00bd00' : '#ccc';
+            const labelText = $('<div>').append(
+                $('<span>', { title: 'NCDOT Reports' }).html('<img style="max-width:25px;" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADwAAAAYCAYAAACmwZ5SAAACwUlEQVRYR82YOWhUURSGv3/iLq6oRQgiFiKSKmoQEUGbiEEbca1SWIiIS2ejjQvYaCFiKSgqQQuX4K4ImkIULVQQ7AQXEjWLoOJyjxy5kUckk/dm5k1m4DJ35p17zv/d9dwnKvfZLmmrmX0GvHwCAvAT+A78Ar4CH4D3sXjdnxWAuliSdf9vqGdKSB+qnqR7BfQnDctFPydpc7lO8mpvZkeAvZUAbpJ0DFiel9gK+X1rZg2lAnu70cAPSc+BxgqJysuNL5s6M2vMAjwK2AB0FgqFQ2bm0/cbMDEvlWX6/Q28MLP9wG3Af49PDSypG5gB9AFTyhSTd/M+SSdCCG/iZunxfMB60wC7zW5JR/NWWQX/PcWApwI7JO0BpldBTDVCdCeBxwLbHE7SYqAlnoHVEFKVGGZ2IAncJulUVSKPQBBJ7SGELQ48AWiQdB2YOwJaKhnSzOwe8ExSE7AImCTpdAihzQM5cIek1oxRewBf42k2vYyuK2Lu4LuA48AsoGvAqyS9BBakCPPUzM4Dj4CHMfGoB2YD/u1HlZ/JY+KsmS9pfQq/uZiY2SagfbBzHyEfKU/Qx0XBk4GZEcCf9QJ34mUgkzhJF4F1mRpVwNj3ohCC584+GI8jw1/PeU/JOZI64wyoAEoqFw8kvTOzjW5tZvuAg/+mdCoX5Rn5pWJJnEH1kuYBXnwZ5N3hHWa2Jik/74DFusqXkZ/9qyWdjfVyutbi5uRL08trM1voF5xaAU7qaJV0wZP7Eonvm9nheEko6mIkR3iwsBZJ1zJmd/1mthM4E9+uDNtftQTsYldKupLyytllZst86g5LmTCoNWCXtkLSZc+QioA8MTPP9f3dWaZPLQI7wFJJd+Pm8x+Qma0FrmYijca1CuzymiXdAKYlwczsJrCqFNhqJB6l6hpo11woFE6GEL7EI+cjcAm4VarjP70usQeYszuIAAAAAElFTkSuQmCC" />'),
+                $('<span>', {
+                    class: 'fa fa-map-marker',
+                    id: 'ncdot-power-btn',
+                    style: `margin-left: 5px;cursor: pointer;color: ${powerButtonColor};font-size: 13px;`,
+                    title: 'Toggle NCDOT Reports'
+                }),
+                $('<span>', {
+                    class: 'fa fa-video',
+                    id: 'ncdot-power-btn-cams',
+                    style: `margin-left: 5px;cursor: pointer;color: ${powerButtonColorCam};font-size: 13px;`,
+                    title: 'Toggle NCDOT Cameras'
+                })
+            ).html();
+
+            const { tabLabel, tabPane } = W.userscripts.registerSidebarTab('NCDOT');
+            tabLabel.innerHTML = labelText;
+            tabPane.innerHTML = content;
+            // Fix tab content div spacing.
+            $(tabPane).parent().css({ width: 'auto', padding: '6px' });
+            $('#ncdot-power-btn').click(evt => {
+                evt.stopPropagation();
+                setEnabled(!_settings.ncdotLayerVisible);
+            });
+            $('#ncdot-power-btn-cams').click(evt => {
+                evt.stopPropagation();
+                setEnabledCam(!_settings.ncdotCameraVisible);
+            });
+
+            await W.userscripts.waitForElementConnected(tabPane);
+
         restoreUserTab();
-        if (_user === 's18slider' || _user === 'the_cre8r' || _user === 'hiroaki27609' || _user === 'dfortney' || _user === 'abelter') {
+        if (_user === 's18slider' || _user === 'the_cre8r' || _user === 'hiroaki27609' || _user === 'elijahpruitt' || _user === 'abelter') {
             $('#ncdot-tabstitle-sm').show();
         }
         if (_user === 'abelter') {
@@ -1303,6 +1369,7 @@
             '.pop-content {display: block;font-family: sans-serif;padding: 5px 10px;}',
             '.nc-dot-popover-cont {display: flex;}',
             '.nc-dot-popover-label {font-size:13px; font-weight:bold; width: 125px; display: inline-block;}',
+            '.nc-dot-popover-banner {font-size:13px; font-weight:bold; width: 480px; display: inline-block; background:#ffff00; text-align:center;}',
             '.nc-dot-popover-data {flex: 1; font-size:13px;}',
             '.monospace {font-family:monospace !important;}',
             '.btn-dot { display:inline-block; align-items: center; font-family: Gotham-Rounded, Rubik, sans-serif; font-size: 12px; font-weight: 500;height: 28px;justify-content: center;line-height: 14px;min-width: 48px;text-align: center;user-select: none;white-space: nowrap; border-width: 1px; border-style: solid; border-color: transparent;border-image: initial;border-radius: 20px;outline: none;padding: 0px 16px;}',
@@ -1352,7 +1419,7 @@
                 copyPL:true,
                 copyDescription:true,
                 autoOpenClosures:false,
-				hidePoly:false,
+		hidePoly:false,
                 hideArchivedReports:true,
                 hideAllButWeatherReports:false,
                 hideInterstatesReports:false,
@@ -1387,16 +1454,20 @@
         WazeWrap.Events.register('selectionchanged', null, openClosuresTab);
     }
 
-    function bootstrap() {
-        let wz = _window.W;
-        if (wz && wz.loginManager && wz.loginManager.user && wz.map && WazeWrap.Ready) {
-            log('Initializing...');
+    function onWmeReady() {
+        if (WazeWrap && WazeWrap.Ready) {
+            logDebug('Initializing...');
             init();
         } else {
-            log('Bootstrap failed. Trying again...');
-            _window.setTimeout(function () {
-                bootstrap();
-            }, 1000);
+            setTimeout(onWmeReady, 100);
+        }
+    }
+
+    function bootstrap() {
+        if (typeof W === 'object' && W.userscripts?.state.isReady) {
+            onWmeReady();
+        } else {
+            document.addEventListener('wme-ready', onWmeReady, { once: true });
         }
     }
 
