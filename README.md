@@ -76,6 +76,17 @@ v 2024.06.16
 v 2024.07.11
 - Polyline compatibility update with latest WME changes to layers
 
+v 2024.08.07
+- Added display of NCDOT Event Names (e.g. 2024 TS Debby) if information is present on incident
+
+v 2024.11.03
+- No longer displays duplicate incidents created from concurrent roads. E.g. I-40 and I-85 between Greensboro and Durham will only show the first incident (same logic applied to NC Closures Sheet; note that this only works if the TIMS incident is properly marked as a concurrency)
+- Advisory banner added on Truck Closure incidents that they should not be closed in WME
+- Fixed PL copier to exclude user layer settings (WME changed length of identifier)
+- New feature: Quick access to turn incident and/or camera layers on/off from top of scripts tab (similar to FC Layers and GIS Layers scripts)
+- Switch to WME native script tab method
+- Other minor updates
+
 ## Installation
 
 Install just like any other userscript by clicking this link:
