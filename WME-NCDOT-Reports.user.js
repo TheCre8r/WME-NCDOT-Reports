@@ -1345,13 +1345,13 @@
         fetchReports(false);
 
         let classHtml = [
-            '.nc-dot-table th,td,tr {cursor:pointer; font: 11px sans-serif;} ',
+            '.nc-dot-table th,.nc-dot-table td,.nc-dot-table tr {cursor:pointer; font: 11px sans-serif;} ',
             '.nc-dot-table .centered {text-align:center;} ',
-            '.nc-dot-table th:hover,tr:hover {background-color:aliceblue; outline: -webkit-focus-ring-color auto 5px;} ',
+            '.nc-dot-table th:hover,.nc-dot-table tr:hover {background-color:aliceblue; outline: -webkit-focus-ring-color auto 5px;} ',
             '.nc-dot-table th:hover {color:#00a4eb; border-color:whitesmoke; } ',
             '.nc-dot-table {border:1px solid gray; border-collapse:collapse; width:100%; font-size:83%;margin:0px 0px 0px 0px} ',
-            '.nc-dot-table th,td {border:1px solid #dcdcdc;} ',
-            '.nc-dot-table td,th {color:black; padding:1px 2px;} ',
+            '.nc-dot-table th,.nc-dot-table td {border:1px solid #dcdcdc;} ',
+            '.nc-dot-table td,.nc-dot-table th {color:black; padding:1px 2px;} ',
             '.nc-dot-table th {background-color:#dcdcdc;} ',
             '.nc-dot-table .table-img {max-width:12px; max-height:12px;} ',
             '#nc-dot-header {margin-bottom:5px;}',
