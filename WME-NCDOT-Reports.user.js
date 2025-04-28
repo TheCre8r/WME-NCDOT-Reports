@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME NCDOT Reports
 // @namespace    https://greasyfork.org/users/45389
-// @version      2024.11.03.01
+// @version      2025.04.28.01
 // @description  Display NC transportation department reports in WME.
 // @author       MapOMatic, The_Cre8r, and ABelter
 // @license      GNU GPLv3
@@ -33,12 +33,7 @@
     const UPDATE_ALERT = true;
     const SCRIPT_CHANGES = [
         '<ul>',
-        '<li>No longer displays duplicate incidents created from concurrent roads. E.g. I-40 and I-85 between Greensboro and Durham will only show the first incident (same logic applied to NC Closures Sheet; note that this only works if the TIMS incident is properly marked as a concurrency)</li>',
-        '<li>Advisory banner added on Truck Closure incidents that they should not be closed in WME</li>',
-        '<li>Fixed PL copier to exclude user layer settings (WME changed length of identifier)</li>',
-        '<li>New feature: Quick access to turn incident and/or camera layers on/off from top of scripts tab (similar to FC Layers and GIS Layers scripts)</li>',
-        '<li>Switch to WME native script tab method</li>',
-        '<li>Other minor updates</li>',
+        '<li>CSS fixes to remove conflicts with UR-MP script formatting</li>',
         '</ul>'
     ].join('\n');
 
