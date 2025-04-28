@@ -87,6 +87,9 @@ v 2024.11.03
 - Switch to WME native script tab method
 - Other minor updates
 
+v 2025.04.28
+- CSS fixes to remove conflict with UR-MP Script's table formatting
+
 ## Installation
 
 Install just like any other userscript by clicking this link:
