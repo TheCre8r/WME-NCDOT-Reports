@@ -4,7 +4,7 @@
 
 This script quickly locates active closures published by NCDOT on North Carolina state-maintained roads. Active closures are retrieved from NCDOT and can be sorted by road name, description, start time and end time. Clicking on a row takes you to the approximate location of the closure, and shows the portion of road closed, as drawn by the closure submitter.
 
-NCDOT closures feed can be refreshed, pulling in the latest closures, using the “Refresh” icon. Additionally, there is a convenient “Archive” feature to archive any closures that have been reviewed.	
+NCDOT closures feed can be refreshed, pulling in the latest closures, using the “Refresh” icon. Additionally, there is a convenient “Archive” feature to hide any closures that have been reviewed from your view.
 
 ![Screenshot](https://raw.githubusercontent.com/abelter/WME-NCDOT-Reports/master/ncdot-reports-screenshot.png)
 
@@ -89,6 +89,15 @@ v 2024.11.03
 
 v 2025.04.28
 - CSS fixes to remove conflict with UR-MP Script's table formatting
+
+v 2025.07.05
+- Updated to use WME SDK
+- Truck Closures now utilize the same icon as DriveNC
+- Offline camera icons now show at 50% opacity
+- Known issues:
+  - Icons appear beneath closures
+  - Archive/Unarchive All functionality broken
+  - Auto-open Closures tab when selecting segments broken
 
 ## Installation
 
