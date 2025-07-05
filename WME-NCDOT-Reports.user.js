@@ -1,27 +1,30 @@
 // ==UserScript==
 // @name         WME NCDOT Reports
 // @namespace    https://greasyfork.org/users/45389
-// @version      2025.04.28.02
+// @version      2025.07.05.00
 // @description  Display NC transportation department reports in WME.
 // @author       MapOMatic, The_Cre8r, and ABelter
 // @license      GNU GPLv3
 // @include      /^https:\/\/(www|beta)\.waze\.com\/(?!user\/)(.{2,6}\/)?editor\/?.*$/
-// @require https://greasyfork.org/scripts/24851-wazewrap/code/WazeWrap.js
+// @require      https://greasyfork.org/scripts/24851-wazewrap/code/WazeWrap.js
+// @require      https://cdn.jsdelivr.net/npm/@turf/turf@7/turf.min.js
+// @require      https://update.greasyfork.org/scripts/509664/WME%20Utils%20-%20Bootstrap.js
 // @grant        GM_xmlhttpRequest
 // @connect      ncdot.gov
 // @connect      services.arcgis.com
+// @downloadURL  https://github.com/TheCre8r/WME-NCDOT-Reports/raw/master/WME-NCDOT-Reports.user.js
+// @updateURL    https://github.com/TheCre8r/WME-NCDOT-Reports/raw/master/WME-NCDOT-Reports.meta.js
 
 // ==/UserScript==
 
 /* global $ */
-/* global OpenLayers */
-/* global W */
-/* global Components */
-/* global I18n */
 /* global WazeWrap */
+/* global turf */
 
-(function() {
+(async function main() {
     'use strict';
+    const downloadUrl = 'https://github.com/TheCre8r/WME-NCDOT-Reports/raw/master/WME-NCDOT-Reports.user.js';
+    const sdk = await bootstrap();
 
     const REPORTS_URL = 'https://eapps.ncdot.gov/services/traffic-prod/v1/incidents?verbose=true';
     const CAMERAS_URL = 'https://eapps.ncdot.gov/services/traffic-prod/v1/cameras?verbose=true'
@@ -33,21 +36,26 @@
     const UPDATE_ALERT = true;
     const SCRIPT_CHANGES = [
         '<ul>',
-        '<li>CSS fixes to remove conflicts with UR-MP script formatting</li>',
+        '<li>Updated to use WME SDK</li>',
+        '<li>Truck Closures now utilize the same icon as DriveNC</li>',
+        '<li>Offline camera icons now show at 50% opacity</li>',
+        '<li>Known issues:<ul><li>Icons appear beneath closures</li><li>Archive/Unarchive All functionality broken</li><li>Auto-open Closures tab when selecting segments broken</li></ul></li>',
         '</ul>'
     ].join('\n');
 
-    let _imagesPath = 'https://github.com/TheCre8r/WME-NCDOT-Reports/raw/master/';
+    const INCIDENT_IMG = 'data:image/png;base64,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'
+    const CAMERA_IMG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAB7JJREFUeNrEVw1Qk/cZ/wVIQgiBECjfAgGRICCgljDHx0qqUxlT2U4objB663Wb28267uimm+62eo5+3HXqzbtuus3evEqdtRPpDkVpUQYqIAURUEC+A8SEAAlJSLLn/xK0SKi5W2/73z3HG97/+39+7+/5PR8vz2634/+5PP6L50LIZI7ferIxspkvBUB73yg+amiDkD9/22Ayw9/HG5vWrlIGSr2L2vvUqu7h8SiNfkZsIwZ9vDxN8mD/kcSo4OtzVtvpqhsdlaMP9XaRkA8ejweTZQ6pMeHYvF7hGoD+cR0++rQVfL475uas2JAUsyInedXvLzd3F15t6eaN66ZhtdnAe/yIkAIZJRYJotIUkUUZiTG1U4bZX3z46e16NwIwa57jNrkMwMPdDV6eAoQ+4wvVWsWGNfKQ00fPfxLRO6yBp4APoWDxY2Z6Q3d6JsTfF3Wf9eBm54Psl/Mya35dsvUnb75/+U8cQr7zaLs5+ycTJnvDt3+wQxkXFlj5q5MXIgbHdBCLhJyjhcX2GGbNiAyWYV/R15GbloDXXtgIpuvy09Wew5rJd18tUL3EwrSc2J0CMBPtishg//4x7d8Pnf6X1GoDBJ97A7vdBiPpQiQQoHRLOt75UT4yEuWIDpEhKykG2zKSudifrKpn8T+6PStZaTBanALgOUN2uaUbnnyPI+/XNv+4o2+EKOcvopsdnpkcg+Lnn0XEM35LnjeaLdh9pAIDai28ibXXXtjU2Kt+mFmYnWJ2SQPp8ZHRl5q6XmzrGSItCOfpJhqY87iIIBRvTGN7lk2t1p4RoolpyR2TM7O40tqd9v3N6Vvo1nmXAIiFgh01zV1e7ABG96xpDjJfL3w7S4ntG5KWFRSlJq6194Ep32iywI0CzETbeKcXBKDEZQCDmsmcPrWGEw7pDJuUq/Fd1XqEynycOn44ZUB1UyennW/Q3gAfMQYmtLja1MWFj7Fwu2dYqUqJldD2qacB4A+NT8bqp2eRIA/BD/MykBAZ7NSxxWpFbWsPekcnkK6IRJI8FD10/dYHV9B6f/CxdigcfaMPg+gqnKzjaQC89YZZCXv7GaMZE5POq2sL6aOxsx+UpoxeTph/u3QT71U3wkQi9BR6zHumZSMaJw1Gd7r0cSUEFoqhhR0olYhwqbkTF/7dhtLNSqyOCMbghA5Xbt+Dl1DAhUVEb8moF3i4I8hPgvBAKV17LMr7Me0j1m2uAJjxk4i0VDxWqFLjuJgWHfor3qyogTJeDqlYhKw1MYik9LvTP4o/nPsEiUT9S1QPWAU98bOiJQe+8UENA2x9Mv7LAbBHBvn1yiRea05+XI8Nq6Pw0/zn0PZgGDJvMdIUEfCXeOHoP+tQRcywOs+qZBiVYVashjSTiw5jVbDjwSi+tymddcthl7LAXyJuIgFuu0IqPkaOflm4EWfrWij35bh+pw8XyfEDKjIiijMLhY1S9d3KaxB5Ujgs1kVnsfrhS6ytiw1vc7TtpwOgGv9xrjLxYH17L6+BHL5y/BzuD41hcFwL/YwJFoo5a1YOgZMA3chA9WJpuWW9YkdWCtUE3jmXe0Hj3YEbEYHSmuyUWMoEEzr71ZwT3ZSRK0x8D3fndZ0D8tgsczYSpR++mZ6gvtp6v8JlAKM6vf3D658d2vutryE0wJdLI26z2/zBriwaTLhKWFagQs+w5khT98CEywBYlztf11ozZTBV/LY0F4EyCUelq8tMwmRd++c7N7Li1H38wrUjFALX27E7bZ42zOJ45bWy6GB/7Vsv78BXEuRcgWFxXmBk8Qwx36wMsyZEUlt+/cU8qFJjcbL6xitd/Wr9cv3D48lBZIE+dllzs6s3NTbq1e3p8X9+nZioa+9FVeMddA6oQezQPiunQjakiCgbYsJkyEldhc3r4rgm1DEw/seKmluVIuqoIm/Jo6q47Dywd+9eNN26hX9UVePukAZTej0mxtR4fm3cX4KCgkoW9k3oZ0DDCrQkSsdQirAAH4QHSB+dNTIycnfLtvycznv3tQKRxJqcnGyVults3ffuLR2/Fiw/Px8BAQG42diI3x08wMtIV3oEBfiL4uLi5P39/XftLi6j0TilUqkY4LVsvCBLIYslY13N28E8bwmAkpISmoT51AZ4bIMvGZs6UsnWZWdnf2d6elrrgn/b7t27D9Az68me+5xlk6WRrWK1jowVksU5xRqQxWJhYWE3xQ4Q7K9PbW1tFwE8yET+RRlQXl5+/NixY5WON3U2idocxu7Z3Z4MBzFgJyDMyTSZztFATGReZ8+erS8rKytf5mCcOXOmYv/+/accoN0cNFsdX0ysFwwweThKsmVJCAoLCxEeHo76+nrs3LmTFxISwnf0cDZIrCZ7lsV13759bzzJO4G7IBQKM+h+JtlXWdjI2JdIGDtDoVDw6Wye02+ABcvLy4NYLH70W6vV4sSJE8jNzWVgBI6QhDJAe/bs+Y3JZOKcnzp1is16SQ6hraCKKYuOjhYVFBS4HT58GM3NzSy02LVr1xfXga1bt2LlypWcc24gkUpRWlrKzK7T6cxtbW3mixcvTlKK8TQazYGWlpZb8fHxoQ0NDe8VFxcbJBIJMjMzbSkpKYiKigIxsshZTk4OBALB078L/pfrPwIMAGFcvKSY8b1qAAAAAElFTkSuQmCC'
+    const TRUCK_IMG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABmJLR0QA/wD/AP+gvaeTAAAE30lEQVRYw7WXe0zTVxTHgQ02toLOB5owHkFxQgREwLKB6GDCZlmGEB/N5pZs2bIs2R8kLi57Gdlc5tyWSMRlL3VGDG6ZzmUJ4gbYJyut4ChKkfEUESgULLTYx4+zcy6/Vh51tLQ7ySf9Pc4993vv79xzb/38PDAAeADZhBxCLiAqngv8s0zy8fO1YdAA5BWke9LOwWh9A9w8Xg7th44w6HpU3QiTHIcu0IXsoTa+6jwMkdlNZug68g3IkzdDbWSiSxTJW6Cr9FsgXzQJstzbzmNoRMa/m0Ep3Mo6+SsrH7rLfgDj1WawDOrBMqAHo/Y6m4UrBXuYT116HhibrpGIDiR6oZ2HIE0GqRIka9JA+sRG6D15BkZu98NgV7dL9D03YahaCsq0HOZvkNWRCFISuhAB35vaO0G2LoONSrI6FYZrZZARHgn02hUPB1CqANztH4T63CKQJWSCqZ1SAr72tPM4xHZV/DrURq+HGx98yn5JREFY+LwCyCZ6+1i+NO58lW7tSLwnAr4zKFRs5K3vlrCAfRXnmIg/IhIgIzh0XgFkt8p/ZjFGlPXuzwK/5G7r3tkPtVFJYO7qcQacT8RsAZM2Oyg3PgO6fQeYHsTfHQHryJsaqp/dAbPts8wcqMZRuRIxWwBZ63sfgzI913G7xh0BeZzVykav2/vRnICUhM8JljhFPDVNhCsB7DPgrFFMtKfdEfAirW36dv988qVLAeTmSoQrAfqqGhaLagbaTncEbHfOwNS3cymA2DZLhCsB/ed+Z7E4i4Vut7kjIJk8FSnZ0Ljrtf8UMFtETsjSOf4dXxxlhYm3eHcEBCJjLcXvw+WYDWC7Y5wRsOrH03Ci5OAMGg6XTq0OHOmwRDnDX/O8GFr2fkiXo27vlOhYPlQjZd+O6v5025e/HYriEyE3ahX0d3SyZ7sTN8BbEbFQQxUzNs0pYlTTyGJQBUU77kkhSqVl3FD4MivFE7f6nAKEK+5VQu1lCXu26MFAdl8YssxZMfUXq0GTL4YrL7yEkSbJLc3TcvzT2HUdSNcKWT2wGcemBKwMp2rCOmyWsJHBYhTgz6+CvrPnmQhKPGlcOoy33CCXswvZjJZR8Rus/BNzIRlU2QVgamuHJqkc1JVVUHnyFNhtNiZA/utvoLl4CSS/nAfr8Aio83aw/KFZQBtAVix0S6YSNkn7gjwpiwWlynanUeuY1nubT0+v88AiX58FI3VqVo2RfG8PJWUUiUbWduBzts9TYlFu1G8tBI1oNyhSs9kzetdWchishhGHrqO+OJI9gugcEe3mCVbdOr86BrRhEXStv1QL3MTd6ZPSQm19dS5MoUkA982mUChysakA8dnhdL+7vWu12lJsQjvf48hjSKDXAoqLi4OtVqt6vs71ev01gUCQjU1o3a9FwpEQX0xCaFlZWSbHcab7dW6xWMwikeht9BUhm5BEJJqfBa/+sFDjJRRMpVIdvJ8AFHgCfcS8gEwkAYlCFiP+3ggI4INEBgUFJQwMDMjnnHxaW9X4fhdC634LkoLEIlSEgn3xCShIGBIjFos3Yz4MOzo3m81DQqGwCN/RiedJJAlZjaxEHvXl30QSsRSJkEqlb/L9cxUVFW/w0x2HrOITjz7ZQ37/g/nzQhaNj4+fMRgMx/iZWc4nm8Any86Dv29ejfJfQDgRAqXMri0AAAAASUVORK5CYII=';
     let _settings = {};
     let _tabDiv = {}; // stores the user tab div so it can be restored after switching back from Events mode to Default mode
-    let _reportsClosures = [];
+    let _allClosures = [];
     let _cameras = [];
     let _lastShownTooltipDiv;
     let _tableSortKeys = [];
     let _columnSortOrder = ['attributes.lastUpdate', 'attributes.start', 'attributes.end','attributes.road', 'attributes.condition','attributes.city'];
     let _reportTitles = {incident: 'INCIDENT'};
     let _mapLayer;
-	let _polyLayer;
+    let _polyLayer;
     let _cameraLayer;
     let _user;
     let _userU;
@@ -67,8 +75,8 @@
             let currentTime = Date.now();
             let settings = {
                 lastVersion: SCRIPT_VERSION,
-                ncdotLayerVisible: _mapLayer.visibility,
-                ncdotCameraVisible: _cameraLayer.visibility,
+                ncdotLayerVisible: sdk.LayerSwitcher.isLayerCheckboxChecked({ name: 'NCDOT Reports' }),
+                ncdotCameraVisible: sdk.LayerSwitcher.isLayerCheckboxChecked({ name: 'NCDOT Cameras' }),
                 state: _settings.state,
                 showCityCountyCheck: $('#settingsShowCityCounty').is(':checked'),
                 hideLocated: $('#settingsHideLocated').is(':checked'),
@@ -206,7 +214,7 @@
 
     function copyIncidentIDsToClipboard() {
         let ids = [];
-        _reportsClosures.forEach(function(report) {
+        _allClosures.forEach(function(report) {
             ids.push(report.attributes.id);
         });
         return copyToClipboard(ids.join('\n'));
@@ -221,7 +229,7 @@
         let closureReason = getReport(id).attributes.incidentType.replace('Other',getReport(id).attributes.condition) + ' - ' + getReport(id).attributes.reason;
         let timsURL = 'https://drivenc.gov/?type=incident&id=' + id;
         let closureDirection = getReport(id).attributes.direction;
-        let permalink = document.querySelector(".WazeControlPermalink .permalink").href;
+        let permalink = sdk.Map.getPermalink();
         permalink = permalink.replace(/(&s=[0-9]{6,30}&)/,'&');
 
         if (!permalink.includes('segments=')) {
@@ -290,7 +298,7 @@
         // Callback handler that will be called on success
         request.done(function (response, textStatus, jqXHR){
             // Log a message to the console
-            console.log("Closure " + id + " successfully sent to closures sheet");
+            log("Closure " + id + " successfully sent to closures sheet");
         });
 
         // Callback handler that will be called on failure
@@ -312,13 +320,13 @@
     }
 
     function getReport(reportId) {
-        for (let i=0; i<_reportsClosures.length; i++) {
-            if (_reportsClosures[i].id === reportId) { return _reportsClosures[i]; }
+        for (let i=0; i<_allClosures.length; i++) {
+            if (_allClosures[i].id === reportId) { return _allClosures[i]; }
         }
     }
     function getCamera(cameraId) {
         for (let i=0; i<_cameras.length; i++) {
-            if (_cameras[i].Id === cameraId) { return _cameras[i]; }
+            if (_cameras[i].id === cameraId) { return _cameras[i]; }
         }
     }
 
@@ -326,7 +334,7 @@
         return $('#settingsHideNCDot' + reportType + 'Reports').is(':checked');
     }
 
-    function updateReportsVisibility() {
+    function updateReportsTableVisibility() {
         hideAllReportPopovers();
         let showCity = $('#settingsShowCityCounty').is(':checked');
         let hideArchived = isHideOptionChecked('Archived');
@@ -344,7 +352,7 @@
         if (hideJump) {
             $('#tims-id-jump').hide();
         } else { $('#tims-id-jump').show(); }
-        _reportsClosures.forEach(function(report) {
+        _allClosures.forEach(function(report) {
             let hide =
                 hideArchived && report.archived ||
                 hideAllButWeather && report.attributes.incidentType !== 'Weather Event' ||
@@ -355,11 +363,11 @@
                 hideXDays && Date.parse(report.attributes.lastUpdate) < Date.parse(xDaysDate);
             if (hide) {
                 report.dataRow.hide();
-                if (report.imageDiv) { report.imageDiv.hide(); }
+                //if (report.imageDiv) { report.imageDiv.hide(); }
             } else {
                 visibleCount += 1;
                 report.dataRow.show();
-                if (report.imageDiv) { report.imageDiv.show(); }
+                //if (report.imageDiv) { report.imageDiv.show(); } // getFeatureDomElement not working as expected
             }
         });
         if (showCity) {
@@ -367,70 +375,77 @@
         } else {
             $('.citycounty').hide();
         }
-        $('.nc-dot-report-count').text(visibleCount + ' of ' + _reportsClosures.length + ' reports');
+        $('.nc-dot-report-count').text(visibleCount + ' of ' + _allClosures.length + ' reports');
     }
 
-    function hideAllPopovers($excludeDiv) {
-        _reportsClosures.forEach(function(rpt) {
-            let $div = rpt.imageDiv;
-            if ((!$excludeDiv || $div[0] !== $excludeDiv[0]) && $div.data('state') === 'pinned') {
-                $div.data('state', '');
+    function hideAllPopovers() {
+        _allClosures.forEach(function(rpt) {
+            if (rpt.state == 'pinned') {
+                rpt.state = '';
                 removePopup(rpt);
             }
         });
-        _cameras.forEach(function(rpt) {
-            let $div = rpt.imageDiv;
-            if ((!$excludeDiv || $div[0] !== $excludeDiv[0]) && $div.data('state') === 'pinned') {
-                $div.data('state', '');
-                removePopup(rpt);
+        _cameras.forEach(function(cam) {
+            if (cam.state == 'pinned') {
+                cam.state = ''
+                removePopup(cam);
             }
         });
-		_polyLayer.removeAllFeatures();
+        sdk.Map.removeAllFeaturesFromLayer({layerName: 'NCDOT Report Polylines'})
     }
 
     function deselectAllDataRows() {
-        _reportsClosures.forEach(function(rpt) {
+        _allClosures.forEach(function(rpt) {
             rpt.dataRow.css('background-color','white');
         });
     }
 
-    function toggleMarkerPopover($div) {
-        hideAllPopovers($div);
-        let id = $div.data('reportId');
-        let report = getReport(id);
-        if ($div.data('state') !== 'pinned') {
+    function toggleMarkerPopover(id) {
+        let report;
+        let type;
+        if (id <= 9999) {
+            report = getCamera(id);
+            type = 'camera'
+        }
+        else {
+            report = getReport(id);
+            type = 'incident'
+        }
+        let rptState = report.state;
+        hideAllPopovers();
+        if (rptState !== 'pinned') {
             let hideLocated = $('#settingsHideLocated').is(':checked');
-            $div.data('state', 'pinned');
-            // W.map.getOLMap().moveTo(report.marker.lonlat);
-
+            report.state = 'pinned';
             showPopup(report);
             if (hideLocated) { $('#pushlocated').hide();
                              } else { $('#pushlocated').show(); }
-            _mapLayer.setZIndex(10001); // this is to help make sure the report shows on top of the turn restriction arrow layer
-            _cameraLayer.setZIndex(10001);
 
             if (report.archived) {
                 $('.btn-archive-dot-report').text("Un-Archive");
             }
 
             let copyRTCDescription = $('#settingsCopyDescription').is(':checked');
-            if (copyRTCDescription) {
+            if (copyRTCDescription && type == 'incident') {
                 copyToClipboard(report.attributes.incidentType.replace('Night Time','Nighttime').replace('Other',report.attributes.condition) + ' - DriveNC.gov ' + id);
                 WazeWrap.Alerts.success(SCRIPT_NAME,"RTC Description copied to clipboard.");
             }
 
-            $('.btn-archive-dot-report').click(function() {setArchiveReport(report,!report.archived, true, true); buildTable();});
-            $('.btn-open-dot-report').click(function(evt) {evt.stopPropagation(); window.open($(this).data('dotReportUrl'),'_blank');});
-            $('.reportPopover,.close-popover').click(function(evt) {evt.stopPropagation(); hideAllReportPopovers();});
+            $('.reportPopover,.close-popover').click(function(evt) {
+                evt.stopPropagation();
+                hideAllReportPopovers();
+            });
+            $('.btn-archive-dot-report').click(function() {
+                setArchiveReport(report,!report.archived, true, true);
+                buildTable();
+            });
+            $('.btn-open-dot-report').click(function(evt) {
+                evt.stopPropagation();
+                window.open($(this).data('dotReportUrl'),'_blank');
+            });
             $('.btn-copy-description').click(function(evt) {
                 evt.stopPropagation();
                 let id = $(this).data('dotReportid');
                 copyToClipboard(report.attributes.incidentType.replace('Night Time','Nighttime').replace('Other',report.attributes.condition) + ' - DriveNC.gov ' + id);
-            });
-            $('.btn-copy-helper-string').click(function(evt) {
-                evt.stopPropagation();
-                let id = $(this).data('dotReportid');
-                copyToClipboard(getReport(id).attributes.incidentType.replace('Night Time','Nighttime').replace('Other',report.attributes.condition) + ' - DriveNC.gov ' + id + '|' + formatDateTimeStringCH(report.attributes.start) + '|' + formatDateTimeStringCH(report.attributes.end));
             });
             $('.btn-copy-report-url').click(function(evt) {
                 evt.stopPropagation();
@@ -443,17 +458,41 @@
                 let id = $(this).data('dotReportid');
                 sendToSheet(id,status);
             });
-            //$(".close-popover").click(function() {hideAllReportPopovers();});
-            $div.data('report').dataRow.css('background-color','#f1f1f1');
+            $('.btn-add-rtc').click(function(evt) {
+                evt.stopPropagation();
+                let id = $(this).data('dotReportid');
+                let rtcStart = report.attributes.start;
+                if (new Date(rtcStart) < new Date(Date.now())) { rtcStart = new Date(Date.now()); }
+                createRTC(getReport(id).attributes.incidentType.replace('Night Time','Nighttime').replace('Other',report.attributes.condition) + ' - DriveNC.gov ' + id,formatDateString(rtcStart),formatTimeString(rtcStart),formatDateString(report.attributes.end),formatTimeString(report.attributes.end))
+            });
+            $('.btn-open-camera-img').click(function(evt) {
+                evt.stopPropagation();
+                window.open($(this).data('cameraImgUrl'),'_blank');
+            });
+            $('.btn-refresh-camera-img').click(function(evt) {
+                evt.stopPropagation();
+                document.getElementById('camera-img-'+id).src = $(this).data('cameraImgUrl') + "&t=" + new Date().getTime();
+            });
+            if (type == 'incident') {
+                report.dataRow.css('background-color','#f1f1f1');
+            }
         } else {
-            $div.data('state', '');
+            report.state = '';
             removePopup(report);
         }
     }
-
-    function toggleReportPopover($div) {
+    function removeMarkerPopover(id) {
         deselectAllDataRows();
-        toggleMarkerPopover($div);
+        let report;
+        if (id <= 9999) { report = getCamera(id); }
+        else { report = getReport(id); }
+        report.state = '';
+        removePopup(report);
+    }
+
+    function toggleReportPopover(id) {
+        deselectAllDataRows();
+        toggleMarkerPopover(id);
     }
 
     function hideAllReportPopovers() {
@@ -465,33 +504,33 @@
         report.archived = archive;
         if (archive) {
             _settings.archivedReports[report.id] = {lastUpdated: report.attributes.lastUpdate};
-            report.imageDiv.addClass('nc-dot-archived-marker');
 
             let copyLink = $('#settingsCopyPL').is(':checked');
             if (singleArchive && copyLink) {
-                let permalink = document.querySelector(".WazeControlPermalink .permalink").href;
+                let permalink = sdk.Map.getPermalink();
                 permalink = permalink.replace(/(&s=[0-9]{6,30}&)/,'&').replace('beta','www');
 
                 if (!permalink.includes('segments=')) {
                     WazeWrap.Alerts.error(SCRIPT_NAME,"No segments were selected. Permalink was not copied to clipboard.");
-                    return;
+                } else {
+                    copyToClipboard(permalink);
+                    WazeWrap.Alerts.success(SCRIPT_NAME,"Permalink copied to clipboard.");
                 }
-                copyToClipboard(permalink);
-                WazeWrap.Alerts.success(SCRIPT_NAME,"Permalink copied to clipboard.");
             }
         }else {
             delete _settings.archivedReports[report.id];
-            report.imageDiv.removeClass('nc-dot-archived-marker');
         }
         if (updateUi) {
             saveSettingsToStorage();
-            updateReportsVisibility();
+            updateReportsTableVisibility();
             hideAllReportPopovers();
+            removeReportFromMap(report);
+            addReportToMap(report);
         }
     }
 
     function archiveAllReports(unarchive) {
-        _reportsClosures.forEach(function(report) {
+        _allClosures.forEach(function(report) {
             setArchiveReport(report, !unarchive, false, false);
         });
         saveSettingsToStorage();
@@ -512,7 +551,6 @@
                     }
                 )
             ),
-            //            $('<td>',{class:'clickable centered'}).append($img),
             $('<td>').text(report.attributes.road),
             $('<td>').html('<div class="citycounty" style="border-bottom:1px dotted #dcdcdc;">' + report.attributes.city + ' (' + report.attributes.countyName + ')</div>' + report.attributes.condition),
             $('<td>').text(formatDateTimeStringTable(report.attributes.start)),
@@ -522,12 +560,10 @@
         .click(function () {
             let $row = $(this);
             let id = $row.data('reportId');
-            let marker = getReport(id).marker;
-            let $imageDiv = report.imageDiv;
-            //if (!marker.onScreen()) {
-            W.map.getOLMap().moveTo(marker.lonlat);
-            //}
-            toggleReportPopover($imageDiv);
+            sdk.Map.setMapCenter({
+                lonLat: { lon: report.attributes.longitude, lat: report.attributes.latitude }
+            });
+            toggleReportPopover(id);
 
         }).data('reportId', report.id);
         report.dataRow = $row;
@@ -589,26 +625,25 @@
             $('<tr>').append(
                 $('<th>', {id:'nc-dot-table-archive-header',class:'centered'}).append(
                     $('<span>', {class:'fa fa-archive',style:'font-size:120%',title:'Sort by archived'}))).append(
-                //                $('<th>', {id:'nc-dot-table-category-header',title:'Sort by report type'})).append(
                 $('<th>',{id:'nc-dot-table-roadname-header',title:'Sort by road'}).text('Road'),
                 $('<th>',{id:'nc-dot-table-desc-header',title:'Sort by description'}).text('Desc'),
                 $('<th>',{id:'nc-dot-table-start-header',title:'Sort by start date'}).text('Start'),
                 $('<th>',{id:'nc-dot-table-end-header',title:'Sort by end date'}).text('End'),
                 $('<th>',{id:'nc-dot-table-updated-header',title:'Sort by updated date'}).text('Updated')
             ));
-        _reportsClosures.sort(dynamicSortMultiple(_columnSortOrder));
-        _reportsClosures.reverse();
+        _allClosures.sort(dynamicSortMultiple(_columnSortOrder));
+        _allClosures.reverse();
         if ( _reSort % 2 == 1) {
-            _reportsClosures.reverse();
+            _allClosures.reverse();
         }
-        _reportsClosures.forEach(function(report) {
+        _allClosures.forEach(function(report) {
             addRow($table, report);
         });
         $('.nc-dot-table').remove();
         $('#nc-dot-report-table').append($table);
         $('.nc-dot-table th').click(function() {onClickColumnHeader(this);});
 
-        updateReportsVisibility();
+        updateReportsTableVisibility();
     }
 
     function removeNull(value) {
@@ -620,27 +655,25 @@
     }
 
     function addReportToMap(report){
-        let coord = report.geometry;
-        let size = new OpenLayers.Size(32,32);
-        let offset = new OpenLayers.Pixel(-(size.w/2), -size.h);
-        let now = new Date(Date.now());
-        let imgName = 'caution.png';
         let attr = report.attributes;
-
-        report.imgUrl = _imagesPath + imgName;
-        let icon = new OpenLayers.Icon(report.imgUrl,size,null);
-        let marker = new OpenLayers.Marker(
-            new OpenLayers.LonLat(report.attributes.longitude,report.attributes.latitude).transform(
-                new OpenLayers.Projection("EPSG:4326"),
-                W.map.getProjectionObject()
-            ),
-            icon
-        );
-
-        marker.report = report;
-        //marker.events.register('click', marker, onMarkerClick);
-        _mapLayer.addMarker(marker);
-
+        let featureType = 'incident';
+        if (attr.incidentType == 'Truck Closure') {
+            featureType = 'truck'
+        }
+        const geo = { type: "Point", coordinates: [ attr.longitude, attr.latitude] };
+        sdk.Map.addFeatureToLayer({
+            layerName: 'NCDOT Reports',
+            feature: {
+                id: report.id,
+                type: "Feature",
+                geometry: geo,
+                properties: {
+                    type: featureType,
+                    archived: report.archived,
+                },
+            },
+        })
+        let marker = { geometry: geo };
         let detailsUrl = 'https://drivenc.gov/?type=incident&id=';
         let adminUrl = 'https://tims.ncdot.gov/tims/V2/Incident/Details/';
         let TIMSadmin = $('#secureSite').is(':checked');
@@ -653,7 +686,6 @@
         content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">City:</div><div class="nc-dot-popover-data">' + removeNull(attr.city) + '  (' + removeNull(attr.countyName) + ' County)</div></div>');
         content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Location:</div><div class="nc-dot-popover-data">' + removeNull(attr.location) + '</div></div>');
         content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Reason:</div><div class="nc-dot-popover-data">' + removeNull(attr.reason) + '</div></div>');
-        //content.push('<span style="font-weight:bold">TIMS ID:</span>&nbsp;&nbsp;' + removeNull(attr.Id) + '<br>');
         content.push('<hr style="margin:4px 0px; border-color:#dcdcdc">');
         content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Start Time:</div><div class="nc-dot-popover-data monospace">' + formatDateTimeString(attr.start) + '</div></div>');
         content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">End Time:</div><div class="nc-dot-popover-data monospace">' + formatDateTimeString(attr.end) + '</div></div>');
@@ -678,70 +710,89 @@
             if (_rank >= 3) {
                 content.push('<button type="button" title="Push to NC Closures Sheet as Closed" class="btn-dot btn-dot-secondary btn-push-to-sheet" data-dot-reportid="' + report.id + '" data-dot-status="Closed"><span class="" />Post to Sheet - Closed</button>');
             }
-            /*content.push('<button type="button" style="float:right;" title="Copy WME Closure Helper string to clipboard" class="btn-dot btn-dot-secondary btn-copy-helper-string" data-dot-reportid="' + report.id + '"><span class="fa fa-copy"></span> CH</button></div>')*/
+            content.push('<button type="button" title="Add RTC" class="btn-dot btn-dot-secondary btn-add-rtc" data-dot-reportid="' + report.id + '"><span class="fa fa-copy"></span> Add RTC to Selected Segment(s)</button></div>')
         }
         content.push('</div></div>');
+        marker.report = report;
 
-        let $imageDiv = $(marker.icon.imageDiv)
-        .css('cursor', 'pointer')
-        .addClass('ncDotReport')
-        .on('click', function(evt) {evt.stopPropagation(); toggleReportPopover($(this));})
-        .data('reportId', report.id)
-        .data('state', '');
+        let $imageDiv;
+        $imageDiv = sdk.Map.getFeatureDomElement({ featureId: report.id, layerName: 'NCDOT Reports' }); // $("#"+marker.id) //only returns if feature is on screen, so pretty darn useless
 
-        $imageDiv.data('report', report);
-        if (report.archived) { $imageDiv.addClass('nc-dot-archived-marker'); }
         report.imageDiv = $imageDiv;
         report.marker = marker;
         report.title = report.id + " - " + attr.condition;
         report.width = "500px";
+        report.state = '';
         report.content = content.join('');
+    }
+
+    function removeReportFromMap(report){
+        let attr = report.attributes;
+        const geo = { type: "Point", coordinates: [ attr.longitude, attr.latitude] };
+        sdk.Map.removeFeatureFromLayer({
+            layerName: 'NCDOT Reports',
+            featureId: report.id
+        })
     }
 
     function showPopup(rpt)
     {
+        rpt.title = (rpt.title ? rpt.title : 'Unnamed');
         var popHtml = '<div id="ncPopup" class="reportPop popup" style="max-width:' + rpt.width + ';width:' + rpt.width + ';z-index: 1000;">' +
             '<div class="arrow"></div>' +
             '<div class="pop-title " id="pop-drag">' + rpt.title + '<div style="float:right;"><div class="close-popover">X</div></div></div>' +
             '<div class="pop-content">' + rpt.content + '</div>' +
             '</div>';
-        $("body").append(popHtml);
-        var iconofs = rpt.imageDiv.offset();
-        var center = $("#ncPopup").width()/2;
+        //const $mapEle = sdk.Map.getMapViewportElement(); // returns code not object
+        const $mapEle = $(".view-area.olMap");
+        $mapEle.append(popHtml);
+
+        const wid = $("#ncPopup").width();
+        const half = wid/2;
+        var pix = sdk.Map.getPixelFromLonLat({lonLat:{lon: rpt.attributes.longitude, lat: rpt.attributes.latitude}});
+        //log(['coords from click','x',pix.x, 'y', pix.y].join(' '));
+        var x = pix.x - half - $('#sidebarContent')[0].offsetWidth - $('#drawer')[0].offsetWidth;
+        var y = pix.y - $('#app-head')[0].offsetHeight;
+        const mintop = 30;
+        const minleft = 30; // $('#sidebarContent')[0].offsetWidth;
+        const maxbot = $mapEle[0].clientHeight;
+        const maxright = $mapEle[0].clientWidth;
+        if (y < mintop) { y = mintop; }
+        if (y+200 > maxbot) { y = maxbot-200; }
+        if (x < minleft) { x = minleft; }
+        if (x + wid > maxright) { x = maxright - wid; }
         var ofs = {};
-        ofs.top = iconofs.top + 30;
-        ofs.left = iconofs.left - center;
+        ofs.top = y;
+        ofs.left = x;
         $("#ncPopup").offset( ofs );
         $("#ncPopup").show();
 
         // Make the popup draggable
         dragElement(document.getElementById("ncPopup"));
         $(".close-popover").click(function() {
-            toggleReportPopover(rpt.imageDiv);
+            removeMarkerPopover(rpt.id);
         });
 
 		// Add incident polyline to map
-		let poly_zindex = W.map.roadLayer.div.style.zIndex-1;
-        let hidePoly = $('#settingsHidePoly').is(':checked');
-        if (hidePoly == false) {
-            let poly = JSON.parse(rpt.attributes.polyline);
-            const pointList = [];
-            poly.coordinates.forEach(point => pointList.push(new OpenLayers.Geometry.Point(point[0],
-                                                                                           point[1]).transform(
-                new OpenLayers.Projection("EPSG:4326"),
-                W.map.getProjectionObject()
-            ),));
-            let lineString = new OpenLayers.Geometry.LineString(pointList);
-            const color = "#FF6F61";
-            const features = [];
-            const vector = new OpenLayers.Feature.Vector(lineString, {
-                strokeWidth: 15,//getStrokeWidth,
-                strokeDashstyle: 'solid',
-                zIndex: poly_zindex,
-                color
-            });
-            features.push(vector);
-            _polyLayer.addFeatures(features);
+        if(rpt.id > 9999) {
+            let poly_zindex = sdk.Map.getLayerZIndex({ layerName: 'roads' }) -1;
+            let hidePoly = $('#settingsHidePoly').is(':checked');
+            if (hidePoly == false) {
+                let poly = JSON.parse(rpt.attributes.polyline);
+                const color = "#FF6F61";
+
+                // new turf method
+                const attr = {
+                    id: rpt.id,
+                    color: color
+                };
+                const line = turf.lineString(poly.coordinates, attr, {id: rpt.id});
+
+                sdk.Map.addFeatureToLayer({
+                    layerName:'NCDOT Report Polylines',
+                    feature: line,
+                });
+            }
         }
     }
 
@@ -786,6 +837,7 @@
         document.onmousemove = null;
       }
     }
+
     function removePopup(rpt)
     {
         $("#ncPopup").remove();
@@ -794,46 +846,22 @@
 
     function openClosuresTab() {
         let autoOpenClosures = $('#settingsAutoOpenClosures').is(':checked');
-        if (autoOpenClosures && (W.selectionManager.getSelectedWMEFeatures().length > 0)) {
-            let selFeat = W.selectionManager.getSelectedWMEFeatures();
-            let allSeg = selFeat.every(e => e.model.type == 'segment'); // Check to ensure that all selected objects are segments
+        const selection = sdk.Editing.getSelection();
+        if (autoOpenClosures && selection.objectType === 'segment') {
+            let selFeat = sdk.Editing.getSelection();
+            let allSeg = selFeat.every(e => e.objectType == 'segment'); // Check to ensure that all selected objects are segments
             if (allSeg) {
                 setTimeout(() => {
-                    $('.closures-tab').click();
+                    $('.segment-edit-section div.wz-tab-label:nth-of-type(2)').click();
                 }, 100);
             }
         }
-        //todo experiment
-        $("li.closure-item, .add-closure-button").click(function() {
-            var tObj = $('#closure_eventId');
-            // Make sure the closure event list is available, and that we haven't already messed with it.
-            if((tObj !== null) && (tObj.tag != "touchedByURO"))
-            {
-                var shadowElm = tObj.shadowRoot.querySelectorAll('.selected-value')[0];
-                if(shadowElm !== undefined)
-                {
-                    WazeWrap.Alerts.info(SCRIPT_NAME,'test');
-                    var eventText = tObj.shadowRoot.querySelectorAll('.selected-value')[0].innerText;
-
-                    if(eventText == I18n.lookup('closures.choose_event'))
-                    {
-
-                        tObj.children[0].click();
-                    }
-                    // Tag the event list to prevent further processing attempts whilst this closure remains open.
-                    tObj.tag = "touchedByURO";
-                }
-            }
-        });
     }
 
     function processReports(reports, showPopupWhenDone) {
         let reportIDs = {};
-        _reportsClosures = [];
+        _allClosures = [];
         _cameras = [];
-        _mapLayer.clearMarkers();
-        _cameraLayer.clearMarkers();
-		_polyLayer.removeAllFeatures();
         fetchCameras();
         logDebug('Processing ' + reports.length + ' reports...');
         let conditionFilter = [
@@ -844,15 +872,21 @@
             'Rest Area Closed',
             'Road Closed',
             'Road Closed with Detour',
-            'Road Impassable'
+            'Road Impassable',
+            'Truck Closure'
         ];
         reports.forEach(function(reportDetails) {
             if (!reportIDs.hasOwnProperty(reportDetails.id)) {
-                //console.log(reportDetails)
                 reportIDs[reportDetails.id] = reportDetails.id;
                 let report = {};
                 report.id = reportDetails.id;
                 report.attributes = reportDetails;
+                if (report.attributes.condition == 'Permanent Road Closure') {
+                    report.attributes.incidentType = 'Permanent Road Closure';
+                }
+                if (report.attributes.incidentType == 'Truck Closure') {
+                    report.attributes.condition = 'Truck Closure';
+                }
                 if (conditionFilter.indexOf(report.attributes.condition) > -1 && report.attributes.createdFromConcurrent == false) {
 					if (report.attributes.road.substring(0,3) == 'SR-') {
 						report.attributes.roadFullName = report.attributes.commonName + (report.attributes.commonName !== report.attributes.road ? ' (' + report.attributes.road.trim() + ')' : '');
@@ -868,7 +902,7 @@
                         }
                     }
                     addReportToMap(report);
-                    _reportsClosures.push(report);
+                    _allClosures.push(report);
                 }
             }
         });
@@ -877,137 +911,101 @@
         if (showPopupWhenDone) {
             WazeWrap.Alerts.success(SCRIPT_NAME, 'Reports Refreshed - ' + formatDateTimeStringTable(new Date(Date.now())));
         }
-        logDebug('Added ' + _reportsClosures.length + ' reports to map.');
+        logDebug('Added ' + _allClosures.length + ' reports to map.');
+    }
+
+    function createRTC(reason,startDate,startTime,endDate,endTime) {
+        let permalink = sdk.Map.getPermalink();
+        permalink = permalink.replace(/(&s=[0-9]{6,30}&)/,'&').replace('beta','www');
+
+        if (!permalink.includes('segments=')) {
+            WazeWrap.Alerts.error(SCRIPT_NAME,"No segments selected. Unable to add closure information");
+            return;
+        }
+        //document.querySelector('.segment-edit-section wz-tabs').shadowRoot.queryselector('div.wz-tab-label:nth-of-type(2)').click();
+        $(".add-closure-button").click();
+        setTimeout(() => {
+            $("#closure_reason").val(reason).change();
+            $("#closure_startDate").val(startDate).change().trigger('keyup');
+            $("#edit-panel div.closures div.form-group.start-date-form-group > div.date-time-picker > wz-text-input.time-picker-input").timepicker('setTime',startTime);
+            $("#closure_endDate").val(endDate).change().trigger('keyup');
+            $("#edit-panel div.closures div.form-group.end-date-form-group > div.date-time-picker > wz-text-input.time-picker-input").timepicker('setTime',endTime);
+            document.querySelector("#closure_eventId > wz-option:nth-child(1)").shadowRoot.querySelector("div").click();
+            document.querySelector(".closure-nodes").nextElementSibling.querySelector("wz-select").value = '12142192756';
+            document.querySelector(".closure-nodes").nextElementSibling.querySelector("wz-select").setAttribute('placeholder', 'N.C. Department of Transportation');
+        }, 100);
+    }
+
+    function changeDateField(element, newDate) {
+        const newDateObj = $(element).data('daterangepicker')
+        newDateObj.setStartDate(newDate)
+        $(element).trigger(
+            'keyup.daterangepicker',//keyup was apply
+            [newDateObj]
+        )
+    }
+
+    function changeTimeField($element, newtime) {
+         $element.timepicker('setTime',newtime);
     }
 
     function fetchReports(showPopupWhenDone) {
+        sdk.Map.removeAllFeaturesFromLayer({layerName: 'NCDOT Reports'});
+        sdk.Map.removeAllFeaturesFromLayer({layerName: 'NCDOT Report Polylines'});
         logDebug('Fetching reports...');
         $('.nc-dot-report-count').text('Loading reports...');
-        $('.nc-dot-refresh-reports').toggleClass("fa-spin");
+        $('.nc-dot-refresh-reports').addClass("fa-spin");
         GM_xmlhttpRequest({
             method: 'GET',
             url: REPORTS_URL,
             onload: function(res) {
                 processReports($.parseJSON(res.responseText), showPopupWhenDone);
-                $('.nc-dot-refresh-reports').toggleClass("fa-spin");
+                $('.nc-dot-refresh-reports').removeClass("fa-spin");
             }
         });
     }
 
     function fetchCameras() {
+        sdk.Map.removeAllFeaturesFromLayer({layerName: 'NCDOT Cameras'})
         GM_xmlhttpRequest({
             method: 'GET',
             url: CAMERAS_URL,
             onload: function(res) {
                 let features = $.parseJSON(res.responseText);
                 features.forEach(function(report) {
-                    if (report.status == "OFF") {
-                        return;
-                    }
-                    let size = new OpenLayers.Size(32,32);
-                    let offset = new OpenLayers.Pixel(-(size.w/2), -size.h);
-                    let now = new Date(Date.now());
-                    let imgName = 'camera.png';
-                    report.imgUrl = _imagesPath + imgName;
-                    let icon = new OpenLayers.Icon(report.imgUrl,size,null);
-                    let marker = new OpenLayers.Marker(
-                        new OpenLayers.LonLat(report.longitude,report.latitude).transform(
-                            new OpenLayers.Projection("EPSG:4326"),
-                            W.map.getProjectionObject()
-                        ),
-                        icon
-                    );
-
-                    marker.report = report;
-                    _cameraLayer.addMarker(marker);
-
-                    let re=/window.open\('(.*?)'/;
+                    const camGeo = { type: "Point", coordinates: [ report.longitude, report.latitude] };
+                    report.attributes = report;
+                    sdk.Map.addFeatureToLayer({
+                        layerName: 'NCDOT Cameras',
+                        feature: {
+                            id: report.id,
+                            type: "Feature",
+                            geometry: camGeo,
+                            properties: {
+                                type: 'camera',
+                                status: report.status,
+                            },
+                        },
+                    })
+                    let marker = { geometry: camGeo };
                     let cameraImgUrl = report.imageURL;
                     let cameraContent = [];
-                    cameraContent.push('<img id="camera-img-'+ report.id +'" src=' + cameraImgUrl + '&t=' + new Date().getTime() + ' style="max-width:352px">');
+                    cameraContent.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-data"><img id="camera-img-'+ report.id +'" src=' + cameraImgUrl + '&t=' + new Date().getTime() + ' style="max-width:352px"></div></div>');
                     //temp removed below until both full-size and refresh buttons can be fixed 2.12.23
-					//cameraContent.push('<div><hr style="margin:5px 0px;border-color:#dcdcdc"><div style="display:table;width:100%"><button type="button" class="btn-dot btn-dot-primary btn-open-camera-img" data-camera-img-url="' + cameraImgUrl + '" style="float:left;">Open Image Full-Size</button><button type="button" class="btn-dot btn-dot-primary btn-refresh-camera-img" data-camera-img-url="' + cameraImgUrl + '" style="float:right;"><span class="fa fa-refresh" /></button></div></div>');
+                    //cameraContent.push('<div><hr style="margin:5px 0px;border-color:#dcdcdc"><div style="display:table;width:100%"><button type="button" class="btn-dot btn-dot-primary btn-open-camera-img" data-camera-img-url="' + cameraImgUrl + '" style="float:left;">Open Image Full-Size</button><button type="button" class="btn-dot btn-dot-primary btn-refresh-camera-img" data-camera-img-url="' + cameraImgUrl + '" style="float:right;"><span class="fa fa-refresh" /></button></div></div>');
                     report.content = cameraContent.join('');
                     report.title = report.displayName;
                     report.width = "370px";
-                    let $imageDiv = $(marker.icon.imageDiv)
-                    .css('cursor', 'pointer')
-                    .addClass('ncDotReport')
-                    .data('cameraId', report.id)
-                    .on('click', function(evt) {
-                        //let $div = $(this);
-                        // let camera = getCamera($div.data('cameraId'));
-                        evt.stopPropagation();
-                        let $div = $(this);
-                        hideAllPopovers($div);
-                        if ($div.data('state') !== 'pinned') {
-                            let id = $div.data('cameraId');
-                            $div.data('state', 'pinned');
-                            //W.map.moveTo(report.marker.lonlat);
-                            showPopup(report);
-                            document.getElementById('camera-img-'+id).src = cameraImgUrl + "&t=" + new Date().getTime(); //by default the images are loaded on page load, this line loads the latest image when the pop-up is opened
-                            $('.btn-open-camera-img').click(function(evt) {evt.stopPropagation(); window.open($(this).data('cameraImgUrl'),'_blank');});
-                            $('.btn-refresh-camera-img').click(function(evt) {evt.stopPropagation(); document.getElementById('camera-img-'+id).src = $(this).data('cameraImgUrl') + "&t=" + new Date().getTime();});
-                            $('.reportPopover,.close-popover').click(function(evt) {
-                                $div.data('state', '');
-                                removePopup(report);
-                            });
-                            //$(".close-popover").click(function() {hideAllReportPopovers();});
-                        } else {
-                            $div.data('state', '');
-                            removePopup(report);
-                        }
-                    })
-                    .data('cameraId', report.id)
-                    .data('state', '');
+                    let $imageDiv;
+                    $imageDiv = sdk.Map.getFeatureDomElement({ featureId: report.id, layerName: 'NCDOT Cameras' }); // $("#"+marker.id) //only returns if feature is on screen, so pretty darn useless // $("#"+marker.id)
 
-                    $imageDiv.data('report', report);
                     report.imageDiv = $imageDiv;
                     report.marker = marker;
+                    report.state = '';
+                    marker.report = report;
                     _cameras.push(report);
                 });
             }
-        });
-    }
-
-    function installIcon() {
-        OpenLayers.Icon = OpenLayers.Class({
-            url: null,
-            size: null,
-            offset: null,
-            calculateOffset: null,
-            imageDiv: null,
-            px: null,
-            initialize: function(a,b,c,d){
-                this.url=a;
-                this.size=b||{w: 20,h: 20};
-                this.offset=c||{x: -(this.size.w/2),y: -(this.size.h)};
-                this.calculateOffset=d;
-                a=OpenLayers.Util.createUniqueID("OL_Icon_");
-                let div = this.imageDiv=OpenLayers.Util.createAlphaImageDiv(a);
-                $(div.firstChild).removeClass('olAlphaImg'); // LEAVE THIS LINE TO PREVENT WME-HARDHATS SCRIPT FROM TURNING ALL ICONS INTO HARDHAT WAZERS --MAPOMATIC
-            },
-            destroy: function(){ this.erase();OpenLayers.Event.stopObservingElement(this.imageDiv.firstChild);this.imageDiv.innerHTML="";this.imageDiv=null; },
-            clone: function(){ return new OpenLayers.Icon(this.url,this.size,this.offset,this.calculateOffset); },
-            setSize: function(a){ null!==a&&(this.size=a); this.draw(); },
-            setUrl: function(a){ null!==a&&(this.url=a); this.draw(); },
-            draw: function(a){
-                OpenLayers.Util.modifyAlphaImageDiv(this.imageDiv,null,null,this.size,this.url,"absolute");
-                this.moveTo(a);
-                return this.imageDiv;
-            },
-            erase: function(){ null!==this.imageDiv&&null!==this.imageDiv.parentNode&&OpenLayers.Element.remove(this.imageDiv); },
-            setOpacity: function(a){ OpenLayers.Util.modifyAlphaImageDiv(this.imageDiv,null,null,null,null,null,null,null,a); },
-            moveTo: function(a){
-                null!==a&&(this.px=a);
-                null!==this.imageDiv&&(null===this.px?this.display(!1): (
-                    this.calculateOffset&&(this.offset=this.calculateOffset(this.size)),
-                    OpenLayers.Util.modifyAlphaImageDiv(this.imageDiv,null,{x: this.px.x+this.offset.x,y: this.px.y+this.offset.y})
-                ));
-            },
-            display: function(a){ this.imageDiv.style.display=a?"": "none"; },
-            isDrawn: function(){ return this.imageDiv&&this.imageDiv.parentNode&&11!=this.imageDiv.parentNode.nodeType; },
-            CLASS_NAME: "OpenLayers.Icon"
         });
     }
 
@@ -1023,89 +1021,155 @@
     }
 
     function init511ReportsOverlay(){
-        installIcon();
-		const POLY_STYLE = {
-			strokeColor: '#FF6F61',
-			strokeDashstyle: 'solid',
-			strokeWidth: '15'
-		};
-        _mapLayer = new OpenLayers.Layer.Markers("NCDOT Reports", { uniqueName: "__ncDotReports" });
-        W.map.addLayer(_mapLayer);
-        _mapLayer.setVisibility(_settings.ncdotLayerVisible);
-        _mapLayer.displayInLayerSwitcher = true;
-        _mapLayer.events.register('visibilitychanged', null, onReportsLayerVisibilityChanged);
-        _mapLayer.setZIndex(10000);
-        WazeWrap.Interface.AddLayerCheckbox('Display', 'NCDOT Reports', _settings.ncdotLayerVisible, onReportsLayerCheckboxChanged);
+// REPORTS LAYER
+        let incident_zindex = sdk.Map.getLayerZIndex({ layerName: 'closures' })+1;
+        _mapLayer = sdk.Map.addLayer({
+            layerName: 'NCDOT Reports',
+            styleRules: [
+                {
+                    style: {
+                        externalGraphic: INCIDENT_IMG,
+                        graphicOpacity: 1,
+                        graphicHeight: 32,
+                        graphicWidth: 32,
+                        graphicXOffset: -16,
+                        graphicYOffset: -32,
+                        graphicZIndex: incident_zindex,
+                        cursor: 'pointer'
+                    },
+                },
+                {
+                    predicate: (properties)=>{ return properties.type == 'incident'; },
+                    style: {
+                        externalGraphic: INCIDENT_IMG,
+                    }
+                },
+                {
+                    predicate: (properties)=>{ return properties.type == 'truck'; },
+                    style: {
+                        externalGraphic: TRUCK_IMG,
+                    }
+                },
+                {
+                    predicate: (properties)=>{ return properties.archived == true; },
+                    style: {
+                        graphicOpacity: 0.5,
+                    },
+                },
+            ],
+        });
+        sdk.Events.trackLayerEvents({ layerName: 'NCDOT Reports' });
+        sdk.Map.setLayerVisibility({ layerName: 'NCDOT Reports', visibility: _settings.ncdotLayerVisible });
+        sdk.LayerSwitcher.addLayerCheckbox({ name: 'NCDOT Reports' });
+        sdk.LayerSwitcher.setLayerCheckboxChecked({ name: 'NCDOT Reports', isChecked: _settings.ncdotLayerVisible });
 
-        _polyLayer = new OpenLayers.Layer.Vector("NCDOT Report Polylines", { uniqueName: "__ncDotReportPolylines",
-            styleMap: new OpenLayers.StyleMap({ default: POLY_STYLE })
-			});
-        W.map.addLayer(_polyLayer);
+// POLY LAYER
+        const POLY_STYLE = [{
+            style: {
+                strokeColor: '#FF6F61',
+                strokeDashstyle: 'solid',
+                strokeOpacity: 1.0,
+                strokeWidth: '15'
+            }
+        }];
+        _polyLayer = sdk.Map.addLayer({
+            layerName:'NCDOT Report Polylines',
+            styleRules: POLY_STYLE,
+            zIndexing: true
+        });
         let hidePoly = $('#settingsHidePoly').is(':checked');
-        _polyLayer.setVisibility(((_settings.ncdotLayerVisible && hidePoly == false) ? true : false));
-		// W.map.setLayerIndex(_polyLayer, W.map.getLayerIndex(W.map.roadLayers[0])-2);
-        // HACK to get around conflict with URO+.  If URO+ is fixed, this can be replaced with the setLayerIndex line above.
-        let poly_zindex = W.map.roadLayer.div.style.zIndex-1;
-        _polyLayer.setZIndex(poly_zindex);
-        const checkLayerZIndex = () => { if (_polyLayer.getZIndex() !== poly_zindex) _polyLayer.setZIndex(poly_zindex); };
+        sdk.Map.setLayerVisibility({ layerName: 'NCDOT Report Polylines', visibility: ((_settings.ncdotLayerVisible && hidePoly == false) ? true : false) })
+        let poly_zindex = sdk.Map.getLayerZIndex({ layerName: 'roads' }) - 1;
+        sdk.Map.setLayerZIndex({ layerName: 'NCDOT Report Polylines', zIndex: poly_zindex })
+        const checkLayerZIndex = () => { if (sdk.Map.getLayerZIndex({ layerName: 'NCDOT Report Polylines' }) !== poly_zindex) sdk.Map.setLayerZIndex({ layerName: 'NCDOT Report Polylines', zIndex: poly_zindex }) };
         setInterval(() => { checkLayerZIndex(); }, 100);
-		// END HACK
 
-        _cameraLayer = new OpenLayers.Layer.Markers("NCDOT Cameras", { uniqueName: "__ncDotCameras" });
-        W.map.addLayer(_cameraLayer);
-        _cameraLayer.setVisibility(_settings.ncdotCameraVisible);
-        _cameraLayer.displayInLayerSwitcher = true;
-        _cameraLayer.events.register('visibilitychanged', null, onCamerasLayerVisibilityChanged);
-        _cameraLayer.setZIndex(10000);
-        WazeWrap.Interface.AddLayerCheckbox('Display', 'NCDOT Cameras', _settings.ncdotCameraVisible, onCamerasLayerCheckboxChanged); // Add the layer checkbox to the Layers menu
+// CAMERA LAYER
+        _cameraLayer = sdk.Map.addLayer({
+            layerName: 'NCDOT Cameras',
+            styleRules: [
+                {
+                    style: {
+                        externalGraphic: CAMERA_IMG,
+                        graphicOpacity: 1,
+                        graphicHeight: 32,
+                        graphicWidth: 32,
+                        graphicXOffset: -16,
+                        graphicYOffset: -32,
+                        cursor: 'pointer'
+                    },
+                },
+                {
+                    predicate: (properties)=>{ return properties.status == 'OFF'; },
+                    style: {
+                        graphicOpacity: 0.5,
+                    }
+                },
 
-        // initialize keyboard shortcut for auto opening closure tab
-        new WazeWrap.Interface.Shortcut('NCDOTOpenClosuresTab', 'Auto open Closures tab on segments', 'ncdot', 'NCDOT Reports', 'SA+c', toggleAutoOpen, null).add();
+            ]
+        });
+        sdk.Events.trackLayerEvents({ layerName: 'NCDOT Cameras' });
+        sdk.Map.setLayerVisibility({ layerName: 'NCDOT Cameras', visibility: _settings.ncdotCameraVisible });
+        sdk.LayerSwitcher.addLayerCheckbox({ name: 'NCDOT Cameras' });
+        sdk.LayerSwitcher.setLayerCheckboxChecked({ name: 'NCDOT Cameras', isChecked: _settings.ncdotCameraVisible });
+
+// EVENTS
+        sdk.Events.on({ eventName: 'wme-layer-checkbox-toggled', eventHandler: onLayerChanged });
+        sdk.Events.on({ eventName: "wme-layer-feature-clicked", eventHandler: onFeatureClick });
+
+// initialize keyboard shortcut for auto opening closure tab
+        sdk.Shortcuts.createShortcut({
+            callback: toggleAutoOpen,
+            description: 'Auto open Closures tab on segments',
+            shortcutId: 'NCDOTOpenClosuresTab',
+            shortcutKeys: 'SA+c'
+        });
     }
 
+
     function setEnabled(value) {
-        _mapLayer.setVisibility(value);
+        sdk.Map.setLayerVisibility({ layerName: 'NCDOT Reports', visibility: value });
+        sdk.LayerSwitcher.setLayerCheckboxChecked({ name: 'NCDOT Reports', isChecked: value });
         let hidePoly = $('#settingsHidePoly').is(':checked');
-        _polyLayer.setVisibility(((value && hidePoly == false) ? true : false));
-        $('#layer-switcher-item_ncdot_reports').prop('checked', value);
+        sdk.Map.setLayerVisibility({ layerName: 'NCDOT Report Polylines', visibility: ((value && hidePoly == false) ? true : false) })
         _settings.ncdotLayerVisible = value;
         const color = value ? '#00bd00' : '#ccc';
         $('span#ncdot-power-btn').css('color', color);
-        console.log(color);
         saveSettingsToStorage();
     }
 
     function setEnabledCam(value) {
-        _cameraLayer.setVisibility(value);
-        $('#layer-switcher-item_ncdot_cameras').prop('checked', value);
+        sdk.Map.setLayerVisibility({ layerName: 'NCDOT Cameras', visibility: value });
+        sdk.LayerSwitcher.setLayerCheckboxChecked({ name: 'NCDOT Cameras', isChecked: value });
         _settings.ncdotCameraVisible = value;
         const colorCam = value ? '#00bd00' : '#ccc';
         $('span#ncdot-power-btn-cams').css('color', colorCam);
-        console.log(colorCam);
         saveSettingsToStorage();
     }
 
-    function onReportsLayerCheckboxChanged(checked) {
-        setEnabled(checked)
+    function onLayerChanged(args) {
+        switch (args.name) {
+            case 'NCDOT Reports':
+                setEnabled(args.checked)
+                break;
+            case 'NCDOT Cameras':
+                setEnabledCam(args.checked)
+                break;
+            default:
+                throw new Error('Unexpected layer switcher name.');
+        }
     }
 
-    function onReportsLayerVisibilityChanged() {
-        setEnabled(_mapLayer.visibility);
-    }
-
-    function onCamerasLayerCheckboxChanged(checked) {
-        setEnabledCam(checked)
-    }
-
-    function onCamerasLayerVisibilityChanged() {
-        setEnabledCam(_cameraLayer.visibility);
+    function onFeatureClick(e) {
+        log('Layer: "'+e.layerName + '" feature clicked: ' + e.featureId);
+        toggleReportPopover(e.featureId);
     }
 
     function onTimsIdGoClick() {
         let $entry = $('#tims-id-entry');
         let id = $entry.val().trim();
         if (id.length > 0) {
-            let report = _reportsClosures.find(rpt => rpt.id.toString() === id)
+            let report = _allClosures.find(rpt => rpt.id.toString() === id)
             if (report) {
                 report.dataRow.click();
                 $entry.css({'background-color':'#afa'});
@@ -1119,11 +1183,9 @@
     }
 
     function restoreUserTab() {
-        //$('#user-tabs > .nav-tabs').append(_tabDiv.tab);
-        //$('#user-info > .flex-parent > .tab-content').append(_tabDiv.panel);
         $('[id^=settings]').change(function(){
             saveSettingsToStorage();
-            updateReportsVisibility();
+            updateReportsTableVisibility();
         });
 
         $('.nc-dot-refresh-reports').click(function(e) {
@@ -1151,7 +1213,6 @@
     }
 
     async function initUserPanel() {
-        const { user } = W.loginManager;
             const content = $('<div>').append(
             $('<div>', {id:'nc-dot-header'}).append(
                 $('<span>', {id:'nc-dot-title'}).text(SCRIPT_NAME),
@@ -1260,7 +1321,7 @@
                     .append($('<label>', {for:'settingsCopyPL'}).text('Copy Permalink when archiving report')),
                     $('<div>',{class:'controls-container'})
                     .append($('<input>', {type:'checkbox',name:'settingsAutoOpenClosures',id:'settingsAutoOpenClosures'}))
-                    .append($('<label>', {for:'settingsAutoOpenClosures'}).html('Auto open Closures tab on segments<br /><em>(keyboard shortcut; default: Alt+Shift+C)</em>')),
+                    .append($('<label>', {for:'settingsAutoOpenClosures'}).html('Auto open Closures tab on segments<br /><em>(enable/disable using Alt+Shift+C)</em>')),
                     $('<div>',{class:'controls-container'})
                     .append($('<input>', {type:'checkbox',name:'settingsHidePoly',id:'settingsHidePoly'}))
                     .append($('<label>', {for:'settingsHidePoly'}).html('Hide DriveNC incident polylines from NCDOT Reports layer'))
@@ -1294,14 +1355,14 @@
                     title: 'Toggle NCDOT Reports'
                 }),
                 $('<span>', {
-                    class: 'fa fa-video',
+                    class: 'fa fa-play-circle',
                     id: 'ncdot-power-btn-cams',
                     style: `margin-left: 5px;cursor: pointer;color: ${powerButtonColorCam};font-size: 13px;`,
                     title: 'Toggle NCDOT Cameras'
                 })
             ).html();
 
-            const { tabLabel, tabPane } = W.userscripts.registerSidebarTab('NCDOT');
+            const { tabLabel, tabPane } = await sdk.Sidebar.registerScriptTab();
             tabLabel.innerHTML = labelText;
             tabPane.innerHTML = content;
             // Fix tab content div spacing.
@@ -1314,8 +1375,6 @@
                 evt.stopPropagation();
                 setEnabledCam(!_settings.ncdotCameraVisible);
             });
-
-            await W.userscripts.waitForElementConnected(tabPane);
 
         restoreUserTab();
         if (_user === 's18slider' || _user === 'the_cre8r' || _user === 'hiroaki27609' || _user === 'elijahpruitt' || _user === 'abelter') {
@@ -1387,8 +1446,8 @@
         ].join('');
         $('<style type="text/css">' + classHtml + '</style>').appendTo('head');
 
-        _previousZoom = W.map.getZoom();
-        W.map.events.register('moveend',null,function() {if (_previousZoom !== W.map.getZoom()) {hideAllReportPopovers();} _previousZoom=W.map.getZoom();});
+        _previousZoom = sdk.Map.getZoomLevel();
+        sdk.Events.on({ eventName: 'wme-map-zoom-changed', eventHandler: function() {if (_previousZoom !== sdk.Map.getZoomLevel()) {hideAllReportPopovers();} _previousZoom=sdk.Map.getZoomLevel();} });
     }
 
     let _previousZoom;
@@ -1414,7 +1473,7 @@
                 copyPL:true,
                 copyDescription:true,
                 autoOpenClosures:false,
-		hidePoly:false,
+                hidePoly:false,
                 hideArchivedReports:true,
                 hideAllButWeatherReports:false,
                 hideInterstatesReports:false,
@@ -1437,35 +1496,18 @@
     }
 
     async function init() {
-        _user = WazeWrap.User.Username().toLowerCase();
-        _userU = WazeWrap.User.Username();
-        _rank = WazeWrap.User.Rank();
+        const u = sdk.State.getUserInfo();
+        _user = u.userName.toLowerCase();
+        _userU = u.userName;
+        _rank = u.rank + 1;
         await loadSettingsFromStorage();
         WazeWrap.Interface.ShowScriptUpdate(SCRIPT_NAME, SCRIPT_VERSION, SCRIPT_CHANGES,`" </a><a target="_blank" href='https://github.com/TheCre8r/WME-NCDOT-Reports'>GitHub</a><a style="display:none;" href="`,'');
         initGui();
         _window.addEventListener('beforeunload', function saveOnClose() { saveSettingsToStorage(); }, false);
         log('Initialized.');
 
-        WazeWrap.Events.register('selectionchanged', null, openClosuresTab);
+        sdk.Events.on({eventName: "wme-selection-changed", eventHandler: () => { openClosuresTab } });
     }
 
-    function onWmeReady() {
-        if (WazeWrap && WazeWrap.Ready) {
-            logDebug('Initializing...');
-            init();
-        } else {
-            setTimeout(onWmeReady, 100);
-        }
-    }
-
-    function bootstrap() {
-        if (typeof W === 'object' && W.userscripts?.state.isReady) {
-            onWmeReady();
-        } else {
-            document.addEventListener('wme-ready', onWmeReady, { once: true });
-        }
-    }
-
-    log('Bootstrap...');
-    bootstrap();
+    init();
 })();
