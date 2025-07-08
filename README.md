@@ -98,6 +98,17 @@ v 2025.07.05
   - Icons appear beneath closures
   - Archive/Unarchive All functionality broken
   - Auto-open Closures tab when selecting segments broken
+ 
+v 2025.07.07
+- New Setting: Open pop-ups in bottom left instead of centered below marker
+- New Setting: Auto open pop-ups if map is centered on incident marker (for PLs from Closures Sheet)
+- New: Button on incident pop-up to zoom and center on incident marker
+- Fixed: Open camera image full size and refresh camera image
+- Known issues:
+  - Icons appear beneath closures
+  - Archive/Unarchive All functionality broken
+  - Auto-open Closures tab when selecting segments broken
+  - Filters in sidebar will not collapse
 
 ## Installation
 
