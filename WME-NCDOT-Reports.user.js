@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME NCDOT Reports
 // @namespace    https://greasyfork.org/users/45389
-// @version      2025.07.05.00
+// @version      2025.07.07.00
 // @description  Display NC transportation department reports in WME.
 // @author       MapOMatic, The_Cre8r, and ABelter
 // @license      GNU GPLv3
@@ -36,10 +36,11 @@
     const UPDATE_ALERT = true;
     const SCRIPT_CHANGES = [
         '<ul>',
-        '<li>Updated to use WME SDK</li>',
-        '<li>Truck Closures now utilize the same icon as DriveNC</li>',
-        '<li>Offline camera icons now show at 50% opacity</li>',
-        '<li>Known issues:<ul><li>Icons appear beneath closures</li><li>Archive/Unarchive All functionality broken</li><li>Auto-open Closures tab when selecting segments broken</li></ul></li>',
+        '<li>New Setting: Open pop-ups in bottom left instead of centered below marker</li>',
+        '<li>New Setting: Auto open pop-ups if map is centered on incident marker (for PLs from Closures Sheet)</li>',
+        '<li>New: Button on incident pop-up to zoom and center on incident marker</li>',
+        '<li>Fixed: Open camera image full size and refresh camera image</li>',
+        '<li>Known issues:<ul><li>Icons appear beneath closures</li><li>Archive/Unarchive All functionality broken</li><li>Auto-open Closures tab when selecting segments broken</li><li>Filters in sidebar will not collapse</li></ul></li>',
         '</ul>'
     ].join('\n');
 
@@ -47,10 +48,8 @@
     const CAMERA_IMG = 'data:image/png;base64,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'
     const TRUCK_IMG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABmJLR0QA/wD/AP+gvaeTAAAE30lEQVRYw7WXe0zTVxTHgQ02toLOB5owHkFxQgREwLKB6GDCZlmGEB/N5pZs2bIs2R8kLi57Gdlc5tyWSMRlL3VGDG6ZzmUJ4gbYJyut4ChKkfEUESgULLTYx4+zcy6/Vh51tLQ7ySf9Pc4993vv79xzb/38PDAAeADZhBxCLiAqngv8s0zy8fO1YdAA5BWke9LOwWh9A9w8Xg7th44w6HpU3QiTHIcu0IXsoTa+6jwMkdlNZug68g3IkzdDbWSiSxTJW6Cr9FsgXzQJstzbzmNoRMa/m0Ep3Mo6+SsrH7rLfgDj1WawDOrBMqAHo/Y6m4UrBXuYT116HhibrpGIDiR6oZ2HIE0GqRIka9JA+sRG6D15BkZu98NgV7dL9D03YahaCsq0HOZvkNWRCFISuhAB35vaO0G2LoONSrI6FYZrZZARHgn02hUPB1CqANztH4T63CKQJWSCqZ1SAr72tPM4xHZV/DrURq+HGx98yn5JREFY+LwCyCZ6+1i+NO58lW7tSLwnAr4zKFRs5K3vlrCAfRXnmIg/IhIgIzh0XgFkt8p/ZjFGlPXuzwK/5G7r3tkPtVFJYO7qcQacT8RsAZM2Oyg3PgO6fQeYHsTfHQHryJsaqp/dAbPts8wcqMZRuRIxWwBZ63sfgzI913G7xh0BeZzVykav2/vRnICUhM8JljhFPDVNhCsB7DPgrFFMtKfdEfAirW36dv988qVLAeTmSoQrAfqqGhaLagbaTncEbHfOwNS3cymA2DZLhCsB/ed+Z7E4i4Vut7kjIJk8FSnZ0Ljrtf8UMFtETsjSOf4dXxxlhYm3eHcEBCJjLcXvw+WYDWC7Y5wRsOrH03Ci5OAMGg6XTq0OHOmwRDnDX/O8GFr2fkiXo27vlOhYPlQjZd+O6v5025e/HYriEyE3ahX0d3SyZ7sTN8BbEbFQQxUzNs0pYlTTyGJQBUU77kkhSqVl3FD4MivFE7f6nAKEK+5VQu1lCXu26MFAdl8YssxZMfUXq0GTL4YrL7yEkSbJLc3TcvzT2HUdSNcKWT2wGcemBKwMp2rCOmyWsJHBYhTgz6+CvrPnmQhKPGlcOoy33CCXswvZjJZR8Rus/BNzIRlU2QVgamuHJqkc1JVVUHnyFNhtNiZA/utvoLl4CSS/nAfr8Aio83aw/KFZQBtAVix0S6YSNkn7gjwpiwWlynanUeuY1nubT0+v88AiX58FI3VqVo2RfG8PJWUUiUbWduBzts9TYlFu1G8tBI1oNyhSs9kzetdWchishhGHrqO+OJI9gugcEe3mCVbdOr86BrRhEXStv1QL3MTd6ZPSQm19dS5MoUkA982mUChysakA8dnhdL+7vWu12lJsQjvf48hjSKDXAoqLi4OtVqt6vs71ev01gUCQjU1o3a9FwpEQX0xCaFlZWSbHcab7dW6xWMwikeht9BUhm5BEJJqfBa/+sFDjJRRMpVIdvJ8AFHgCfcS8gEwkAYlCFiP+3ggI4INEBgUFJQwMDMjnnHxaW9X4fhdC634LkoLEIlSEgn3xCShIGBIjFos3Yz4MOzo3m81DQqGwCN/RiedJJAlZjaxEHvXl30QSsRSJkEqlb/L9cxUVFW/w0x2HrOITjz7ZQ37/g/nzQhaNj4+fMRgMx/iZWc4nm8Any86Dv29ejfJfQDgRAqXMri0AAAAASUVORK5CYII=';
     let _settings = {};
-    let _tabDiv = {}; // stores the user tab div so it can be restored after switching back from Events mode to Default mode
     let _allClosures = [];
     let _cameras = [];
-    let _lastShownTooltipDiv;
     let _tableSortKeys = [];
     let _columnSortOrder = ['attributes.lastUpdate', 'attributes.start', 'attributes.end','attributes.road', 'attributes.condition','attributes.city'];
     let _reportTitles = {incident: 'INCIDENT'};
@@ -85,6 +84,8 @@
                 copyDescription: $('#settingsCopyDescription').is(':checked'),
                 autoOpenClosures: $('#settingsAutoOpenClosures').is(':checked'),
                 hidePoly: $('#settingsHidePoly').is(':checked'),
+                positionLeft: $('#settingsPositionLeft').is(':checked'),
+                autoOpenPopup: $('#settingsAutoOpenPopup').is(':checked'),
                 hideArchivedReports: $('#settingsHideNCDotArchivedReports').is(':checked'),
                 hideAllButWeatherReports: $('#settingsHideNCDotAllButWeatherReports').is(':checked'),
                 hideInterstatesReports: $('#settingsHideNCDotInterstatesReports').is(':checked'),
@@ -417,8 +418,11 @@
             let hideLocated = $('#settingsHideLocated').is(':checked');
             report.state = 'pinned';
             showPopup(report);
-            if (hideLocated) { $('#pushlocated').hide();
-                             } else { $('#pushlocated').show(); }
+            if (hideLocated) {
+                $('#pushlocated').hide();
+            } else {
+                $('#pushlocated').show();
+            }
 
             if (report.archived) {
                 $('.btn-archive-dot-report').text("Un-Archive");
@@ -446,11 +450,13 @@
                 evt.stopPropagation();
                 let id = $(this).data('dotReportid');
                 copyToClipboard(report.attributes.incidentType.replace('Night Time','Nighttime').replace('Other',report.attributes.condition) + ' - DriveNC.gov ' + id);
+                WazeWrap.Alerts.success(SCRIPT_NAME,"RTC Description copied to clipboard.");
             });
             $('.btn-copy-report-url').click(function(evt) {
                 evt.stopPropagation();
                 let url = $(this).data('dotReporturl');
                 copyToClipboard(url);
+                WazeWrap.Alerts.success(SCRIPT_NAME,"Incident URL copied to clipboard.");
             });
             $('.btn-push-to-sheet').click(function(evt) {
                 evt.stopPropagation();
@@ -472,6 +478,20 @@
             $('.btn-refresh-camera-img').click(function(evt) {
                 evt.stopPropagation();
                 document.getElementById('camera-img-'+id).src = $(this).data('cameraImgUrl') + "&t=" + new Date().getTime();
+            });
+            $('.btn-center-and-zoom').click(function(evt) {
+                evt.stopPropagation();
+                let zoom = 16;
+                if (sdk.Map.getZoomLevel() >= 16 && sdk.Map.getZoomLevel() < 22) {
+                    zoom = sdk.Map.getZoomLevel() + 1;
+                } else if (sdk.Map.getZoomLevel() == 22) {
+                    zoom = 22;
+                }
+                sdk.Map.setMapCenter({
+                    lonLat: { lon: report.attributes.longitude, lat: report.attributes.latitude },
+                    zoomLevel: zoom,
+                });
+                showPopup(report);
             });
             if (type == 'incident') {
                 report.dataRow.css('background-color','#f1f1f1');
@@ -682,7 +702,7 @@
         if (attr.incidentType == 'Truck Closure') {
             content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-banner">Truck Closures should <u>not</u> be added to WME!<br>If added by WazeFeed, please delete the closure.</div></div>');
         }
-        content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Road:</div><div class="nc-dot-popover-data">' + removeNull(attr.roadFullName) + '</div></div>');
+        content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Road:</div><div class="nc-dot-popover-data">' + removeNull(attr.roadFullName) + '</div><button type="button" title="Zoom and Center" class="btn-dot btn-dot-secondary btn-center-and-zoom data-dot-reportid="' + report.id + '" style="margin-left:6px;"><span class="fa fa-search-plus" /></button></div>');
         content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">City:</div><div class="nc-dot-popover-data">' + removeNull(attr.city) + '  (' + removeNull(attr.countyName) + ' County)</div></div>');
         content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Location:</div><div class="nc-dot-popover-data">' + removeNull(attr.location) + '</div></div>');
         content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Reason:</div><div class="nc-dot-popover-data">' + removeNull(attr.reason) + '</div></div>');
@@ -696,7 +716,7 @@
         content.push('<hr style="margin:4px 0px; border-color:#dcdcdc">');
         content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">Last Updated:</div><div class="nc-dot-popover-data monospace">' + formatDateTimeString(attr.lastUpdate) + '</div></div>');
         content.push('<hr style="margin:4px 0px; border-color:#dcdcdc">');
-        content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label" style="padding-top: 6px;">RTC Description:</div><div class="nc-dot-popover-data"><div style="display:inline-block;padding-top: 6px;">' + removeNull(attr.incidentType).replace('Night Time','Nighttime').replace('Other',report.attributes.condition) + ' - DriveNC.gov ' + report.id + '&nbsp;&nbsp;</div><button type="button" title="Copy short description to clipboard" class="btn-dot btn-dot-secondary btn-copy-description" data-dot-reportid="' + report.id + '" style="margin-left:6px;"><span class="fa fa-copy" /></button></div></div>');
+        content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label" style="padding-top: 6px;">RTC Description:</div><div class="nc-dot-popover-data"><div style="display:inline-block;padding-top: 6px;">' + removeNull(attr.incidentType).replace('Night Time','Nighttime').replace('Other',report.attributes.condition) + ' - DriveNC.gov ' + report.id + '&nbsp;&nbsp;</div><button type="button" title="Copy RTC description to clipboard" class="btn-dot btn-dot-secondary btn-copy-description" data-dot-reportid="' + report.id + '" style="margin-left:6px;"><span class="fa fa-copy" /></button></div></div>');
         if (attr.eventId > 1) { content.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-label">NCDOT Event:</div><div class="nc-dot-popover-data">' + removeNull(attr.event) + '</div></div>'); }
         if (TIMSadmin) {
             content.push('<hr style="margin:5px 0px; border-color:#dcdcdc"><div style="display:table;width:100%"><button type="button" class="btn-dot btn-dot-primary btn-open-dot-report" data-dot-report-url="' + adminUrl + report.id + '" style="float:left;">TIMS Admin <span class="fa fa-external-link" /></button><button type="button" title="Copy TIMS Admin URL to clipboard" class="btn-dot btn-dot-secondary btn-copy-report-url" data-dot-reporturl="' + adminUrl + report.id + '" style="float:left;margin-left:6px;"><span class="fa fa-copy"></span> URL</button>');
@@ -706,7 +726,7 @@
         content.push('<button type="button" style="float:right;" class="btn-dot btn-dot-primary btn-archive-dot-report" data-dot-report-id="' + report.id + '">Archive</button></div>');
 
         if (_user === 'abelter') {
-            content.push('<div style="display:table;width:100%;margin-top:5px;"><button type="button" id="pushlocated" title="Push to NC Closures Sheet as Located" class="btn-dot btn-dot-secondary btn-push-to-sheet" data-dot-reportid="' + report.id + '" data-dot-status="Located"style="margin-right:6px;"><span class="" />Post to Sheet - Located</button>');
+            content.push('<div style="display:table;width:100%;margin-top:5px;"><button type="button" id="pushlocated" title="Push to NC Closures Sheet as Located" class="btn-dot btn-dot-secondary btn-push-to-sheet" data-dot-reportid="' + report.id + '" data-dot-status="Located" style="margin-right:6px; display:none;"><span class="" />Post to Sheet - Located</button>');
             if (_rank >= 3) {
                 content.push('<button type="button" title="Push to NC Closures Sheet as Closed" class="btn-dot btn-dot-secondary btn-push-to-sheet" data-dot-reportid="' + report.id + '" data-dot-status="Closed"><span class="" />Post to Sheet - Closed</button>');
             }
@@ -737,6 +757,7 @@
 
     function showPopup(rpt)
     {
+        _previousZoom = sdk.Map.getZoomLevel();
         rpt.title = (rpt.title ? rpt.title : 'Unnamed');
         var popHtml = '<div id="ncPopup" class="reportPop popup" style="max-width:' + rpt.width + ';width:' + rpt.width + ';z-index: 1000;">' +
             '<div class="arrow"></div>' +
@@ -747,20 +768,32 @@
         const $mapEle = $(".view-area.olMap");
         $mapEle.append(popHtml);
 
-        const wid = $("#ncPopup").width();
-        const half = wid/2;
-        var pix = sdk.Map.getPixelFromLonLat({lonLat:{lon: rpt.attributes.longitude, lat: rpt.attributes.latitude}});
-        //log(['coords from click','x',pix.x, 'y', pix.y].join(' '));
-        var x = pix.x - half - $('#sidebarContent')[0].offsetWidth - $('#drawer')[0].offsetWidth;
-        var y = pix.y - $('#app-head')[0].offsetHeight;
+        var x;
+        var y;
+        var positionSetting = $('#settingsPositionLeft').is(':checked');
         const mintop = 30;
         const minleft = 30; // $('#sidebarContent')[0].offsetWidth;
         const maxbot = $mapEle[0].clientHeight;
         const maxright = $mapEle[0].clientWidth;
-        if (y < mintop) { y = mintop; }
-        if (y+200 > maxbot) { y = maxbot-200; }
-        if (x < minleft) { x = minleft; }
-        if (x + wid > maxright) { x = maxright - wid; }
+        if ( positionSetting ) {
+            var height = $("#ncPopup").height();
+            if (height < 307) {
+                height = 307;
+            }
+            y = maxbot - height - 75;
+            x = 30;
+        } else {
+            const wid = $("#ncPopup").width();
+            const half = wid/2;
+            var pix = sdk.Map.getPixelFromLonLat({lonLat:{lon: rpt.attributes.longitude, lat: rpt.attributes.latitude}});
+            //log(['coords from click','x',pix.x, 'y', pix.y].join(' '));
+            x = pix.x - half - $('#sidebarContent')[0].offsetWidth - $('#drawer')[0].offsetWidth;
+            y = pix.y - $('#app-head')[0].offsetHeight;
+            if (y < mintop) { y = mintop; }
+            if (y+200 > maxbot) { y = maxbot-200; }
+            if (x < minleft) { x = minleft; }
+            if (x + wid > maxright) { x = maxright - wid; }
+        }
         var ofs = {};
         ofs.top = y;
         ofs.left = x;
@@ -991,8 +1024,7 @@
                     let cameraImgUrl = report.imageURL;
                     let cameraContent = [];
                     cameraContent.push('<div class="nc-dot-popover-cont"><div class="nc-dot-popover-data"><img id="camera-img-'+ report.id +'" src=' + cameraImgUrl + '&t=' + new Date().getTime() + ' style="max-width:352px"></div></div>');
-                    //temp removed below until both full-size and refresh buttons can be fixed 2.12.23
-                    //cameraContent.push('<div><hr style="margin:5px 0px;border-color:#dcdcdc"><div style="display:table;width:100%"><button type="button" class="btn-dot btn-dot-primary btn-open-camera-img" data-camera-img-url="' + cameraImgUrl + '" style="float:left;">Open Image Full-Size</button><button type="button" class="btn-dot btn-dot-primary btn-refresh-camera-img" data-camera-img-url="' + cameraImgUrl + '" style="float:right;"><span class="fa fa-refresh" /></button></div></div>');
+                    cameraContent.push('<div><hr style="margin:5px 0px;border-color:#dcdcdc"><div style="display:table;width:100%"><button type="button" class="btn-dot btn-dot-primary btn-open-camera-img" data-camera-img-url="' + cameraImgUrl + '" style="float:left;">Open Image Full-Size</button><button type="button" class="btn-dot btn-dot-primary btn-refresh-camera-img" data-camera-img-url="' + cameraImgUrl + '" style="float:right;"><span class="fa fa-refresh" /></button></div></div>');
                     report.content = cameraContent.join('');
                     report.title = report.displayName;
                     report.width = "370px";
@@ -1116,6 +1148,7 @@
 // EVENTS
         sdk.Events.on({ eventName: 'wme-layer-checkbox-toggled', eventHandler: onLayerChanged });
         sdk.Events.on({ eventName: "wme-layer-feature-clicked", eventHandler: onFeatureClick });
+        sdk.Events.on({ eventName: "wme-map-move-end", eventHandler: onMapMove });
 
 // initialize keyboard shortcut for auto opening closure tab
         sdk.Shortcuts.createShortcut({
@@ -1128,20 +1161,28 @@
 
 
     function setEnabled(value) {
+        hideAllReportPopovers();
         sdk.Map.setLayerVisibility({ layerName: 'NCDOT Reports', visibility: value });
         sdk.LayerSwitcher.setLayerCheckboxChecked({ name: 'NCDOT Reports', isChecked: value });
         let hidePoly = $('#settingsHidePoly').is(':checked');
         sdk.Map.setLayerVisibility({ layerName: 'NCDOT Report Polylines', visibility: ((value && hidePoly == false) ? true : false) })
         _settings.ncdotLayerVisible = value;
+        if(value){
+            fetchReports(true);
+        }
         const color = value ? '#00bd00' : '#ccc';
         $('span#ncdot-power-btn').css('color', color);
         saveSettingsToStorage();
     }
 
     function setEnabledCam(value) {
+        hideAllReportPopovers();
         sdk.Map.setLayerVisibility({ layerName: 'NCDOT Cameras', visibility: value });
         sdk.LayerSwitcher.setLayerCheckboxChecked({ name: 'NCDOT Cameras', isChecked: value });
         _settings.ncdotCameraVisible = value;
+        if(value){
+            fetchCameras();
+        }
         const colorCam = value ? '#00bd00' : '#ccc';
         $('span#ncdot-power-btn-cams').css('color', colorCam);
         saveSettingsToStorage();
@@ -1165,9 +1206,25 @@
         toggleReportPopover(e.featureId);
     }
 
+    function onMapMove() {
+        // build out functionality to fetch incident updates on major map moves (i.e. not just panning around an existing incidents)
+        if (true) { // replace with setting for whether to fetch incident updates on each map move
+            //fetchReports(true);
+        }
+        // function to open pop-up if map is centered on pin (like... exactly)
+        if ($('#settingsAutoOpenPopup').is(':checked')) {
+            let center = sdk.Map.getMapCenter();
+            for (let i=0; i<_allClosures.length; i++) {
+                if (_allClosures[i].attributes.longitude == parseFloat(center.lon.toFixed(5)) && _allClosures[i].attributes.latitude == parseFloat(center.lat.toFixed(5))) {
+                    toggleReportPopover(_allClosures[i].id);
+                }
+            }
+        }
+    }
+
     function onTimsIdGoClick() {
         let $entry = $('#tims-id-entry');
-        let id = $entry.val().trim();
+        let id = $entry.val().trim()
         if (id.length > 0) {
             let report = _allClosures.find(rpt => rpt.id.toString() === id)
             if (report) {
@@ -1324,7 +1381,13 @@
                     .append($('<label>', {for:'settingsAutoOpenClosures'}).html('Auto open Closures tab on segments<br /><em>(enable/disable using Alt+Shift+C)</em>')),
                     $('<div>',{class:'controls-container'})
                     .append($('<input>', {type:'checkbox',name:'settingsHidePoly',id:'settingsHidePoly'}))
-                    .append($('<label>', {for:'settingsHidePoly'}).html('Hide DriveNC incident polylines from NCDOT Reports layer'))
+                    .append($('<label>', {for:'settingsHidePoly'}).html('Hide DriveNC incident polylines from NCDOT Reports layer')),
+                    $('<div>',{class:'controls-container'})
+                    .append($('<input>', {type:'checkbox',name:'settingsPositionLeft',id:'settingsPositionLeft'}))
+                    .append($('<label>', {for:'settingsPositionLeft'}).html('Open pop-ups at bottom left of window instead of centered on marker')),
+                    $('<div>',{class:'controls-container'})
+                    .append($('<input>', {type:'checkbox',name:'settingsAutoOpenPopup',id:'settingsAutoOpenPopup'}))
+                    .append($('<label>', {for:'settingsAutoOpenPopup'}).html('Open pop-up automatically if map is centered on incident lat/lon (designed for opening PLs)'))
                 ),
                 $('<div>',{id:'ncdot-tabs-sm',class:'tab-pane'}).append(
                     $('<div>', {id:'sm-active-closures'}).append(
@@ -1389,8 +1452,8 @@
                 if (_settings[settingProps[i]]) { $('#' + checkboxIds[i]).attr('checked', 'checked'); }
             }
             $('#settingsHideNCDotXDaysNumber').attr('value', _settings.hideXDaysNumber)
-        })(['showCityCountyCheck','hideLocated','hideJump','copyPL','copyDescription','autoOpenClosures','hidePoly','hideArchivedReports','hideAllButWeatherReports', 'secureSite','hideInterstatesReports','hideUSHighwaysReports','hideNCHighwaysReports','hideSRHighwaysReports','hideXDaysReports','hideXDaysNumber'],
-           ['settingsShowCityCounty','settingsHideLocated','settingsHideJump','settingsCopyPL','settingsCopyDescription','settingsAutoOpenClosures','settingsHidePoly','settingsHideNCDotArchivedReports','settingsHideNCDotAllButWeatherReports', 'secureSite','settingsHideNCDotInterstatesReports','settingsHideNCDotUSHighwaysReports','settingsHideNCDotNCHighwaysReports','settingsHideNCDotSRHighwaysReports','settingsHideNCDotXDaysReports','settingsHideNCDotXDaysNumber']);
+        })(['showCityCountyCheck','hideLocated','hideJump','copyPL','copyDescription','autoOpenClosures','hidePoly','positionLeft','autoOpenPopup','hideArchivedReports','hideAllButWeatherReports', 'secureSite','hideInterstatesReports','hideUSHighwaysReports','hideNCHighwaysReports','hideSRHighwaysReports','hideXDaysReports','hideXDaysNumber'],
+           ['settingsShowCityCounty','settingsHideLocated','settingsHideJump','settingsCopyPL','settingsCopyDescription','settingsAutoOpenClosures','settingsHidePoly','settingsPositionLeft','settingsAutoOpenPopup','settingsHideNCDotArchivedReports','settingsHideNCDotAllButWeatherReports', 'secureSite','settingsHideNCDotInterstatesReports','settingsHideNCDotUSHighwaysReports','settingsHideNCDotNCHighwaysReports','settingsHideNCDotSRHighwaysReports','settingsHideNCDotXDaysReports','settingsHideNCDotXDaysNumber']);
     }
 
     function initGui() {
@@ -1474,6 +1537,8 @@
                 copyDescription:true,
                 autoOpenClosures:false,
                 hidePoly:false,
+                positionLeft:false,
+                autoOpenPopup:false,
                 hideArchivedReports:true,
                 hideAllButWeatherReports:false,
                 hideInterstatesReports:false,
