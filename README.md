@@ -109,6 +109,16 @@ v 2025.07.07
   - Archive/Unarchive All functionality broken
   - Auto-open Closures tab when selecting segments broken
   - Filters in sidebar will not collapse
+ 
+v 2025.07.09
+- New Setting: Hide archived reports instead of displaying at 50% opacity
+- New Feature: Common Road Name shown in tooltip when hovering over Road column of table
+- Fixed: Bug introduced in v2025.07.07 when using the new "open pop-up automatically" setting and opening reports from table
+- Fixed: Filters in sidebar not collapsing/li>
+- Fixed: Archive/Unarchive All functionality/li>
+- Known issues:
+  - Icons appear beneath closures
+  - Auto-open Closures tab when selecting segments broken
 
 ## Installation
 
