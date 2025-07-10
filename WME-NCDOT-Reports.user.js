@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME NCDOT Reports
 // @namespace    https://greasyfork.org/users/45389
-// @version      2025.07.07.00
+// @version      2025.07.09.00
 // @description  Display NC transportation department reports in WME.
 // @author       MapOMatic, The_Cre8r, and ABelter
 // @license      GNU GPLv3
@@ -24,7 +24,8 @@
 (async function main() {
     'use strict';
     const downloadUrl = 'https://github.com/TheCre8r/WME-NCDOT-Reports/raw/master/WME-NCDOT-Reports.user.js';
-    const sdk = await bootstrap();
+    const scriptVersion = GM_info.script.version;
+    const sdk = await bootstrap({ scriptUpdateMonitor: { downloadUrl } });
 
     const REPORTS_URL = 'https://eapps.ncdot.gov/services/traffic-prod/v1/incidents?verbose=true';
     const CAMERAS_URL = 'https://eapps.ncdot.gov/services/traffic-prod/v1/cameras?verbose=true'
@@ -36,11 +37,12 @@
     const UPDATE_ALERT = true;
     const SCRIPT_CHANGES = [
         '<ul>',
-        '<li>New Setting: Open pop-ups in bottom left instead of centered below marker</li>',
-        '<li>New Setting: Auto open pop-ups if map is centered on incident marker (for PLs from Closures Sheet)</li>',
-        '<li>New: Button on incident pop-up to zoom and center on incident marker</li>',
-        '<li>Fixed: Open camera image full size and refresh camera image</li>',
-        '<li>Known issues:<ul><li>Icons appear beneath closures</li><li>Archive/Unarchive All functionality broken</li><li>Auto-open Closures tab when selecting segments broken</li><li>Filters in sidebar will not collapse</li></ul></li>',
+        '<li>New Setting: Hide archived reports instead of displaying at 50% opacity</li>',
+        '<li>New Feature: Common Road Name shown in tooltip when hovering over Road column of table</li>',
+        '<li>Fixed: Bug introduced in v2025.07.07 when using the new "open pop-up automatically" setting and opening reports from table</li>',
+        '<li>Fixed: Filters in sidebar not collapsing/li>',
+        '<li>Fixed: Archive/Unarchive All functionality/li>',
+        '<li>Known issues:<ul><li>Icons appear beneath closures</li><li>Auto-open Closures tab when selecting segments broken</li></ul></li>',
         '</ul>'
     ].join('\n');
 
@@ -86,6 +88,7 @@
                 hidePoly: $('#settingsHidePoly').is(':checked'),
                 positionLeft: $('#settingsPositionLeft').is(':checked'),
                 autoOpenPopup: $('#settingsAutoOpenPopup').is(':checked'),
+                hideArchivedOnMap: $('#settingsHideArchivedOnMap').is(':checked'),
                 hideArchivedReports: $('#settingsHideNCDotArchivedReports').is(':checked'),
                 hideAllButWeatherReports: $('#settingsHideNCDotAllButWeatherReports').is(':checked'),
                 hideInterstatesReports: $('#settingsHideNCDotInterstatesReports').is(':checked'),
@@ -491,7 +494,7 @@
                     lonLat: { lon: report.attributes.longitude, lat: report.attributes.latitude },
                     zoomLevel: zoom,
                 });
-                showPopup(report);
+                toggleReportPopover(report.id);
             });
             if (type == 'incident') {
                 report.dataRow.css('background-color','#f1f1f1');
@@ -522,6 +525,10 @@
 
     function setArchiveReport(report, archive, updateUi, singleArchive) {
         report.archived = archive;
+        let hideArchivedOnMap = $('#settingsHideArchivedOnMap').is(':checked');
+        if (hideArchivedOnMap) {
+            report.hidden = archive;
+        }
         if (archive) {
             _settings.archivedReports[report.id] = {lastUpdated: report.attributes.lastUpdate};
 
@@ -571,7 +578,7 @@
                     }
                 )
             ),
-            $('<td>').text(report.attributes.road),
+            $('<td>').text(report.attributes.road).attr('title',report.attributes.commonName),
             $('<td>').html('<div class="citycounty" style="border-bottom:1px dotted #dcdcdc;">' + report.attributes.city + ' (' + report.attributes.countyName + ')</div>' + report.attributes.condition),
             $('<td>').text(formatDateTimeStringTable(report.attributes.start)),
             $('<td>').text(formatDateTimeStringTable(report.attributes.end)),
@@ -580,10 +587,15 @@
         .click(function () {
             let $row = $(this);
             let id = $row.data('reportId');
+            let center = sdk.Map.getMapCenter();
+            let centerLon = parseFloat(center.lon.toFixed(5));
+            let centerLat = parseFloat(center.lat.toFixed(5));
             sdk.Map.setMapCenter({
-                lonLat: { lon: report.attributes.longitude, lat: report.attributes.latitude }
+                lonLat: {lon: report.attributes.longitude, lat: report.attributes.latitude}
             });
-            toggleReportPopover(id);
+            if (!$('#settingsAutoOpenPopup').is(':checked') || (report.attributes.longitude == centerLon && report.attributes.latitude == centerLat)) { // if this setting is checked, it will handle opening the popover instead of here, except when the map is already centered on the marker
+                toggleReportPopover(id);
+            }
 
         }).data('reportId', report.id);
         report.dataRow = $row;
@@ -690,6 +702,7 @@
                 properties: {
                     type: featureType,
                     archived: report.archived,
+                    hidden: report.hidden,
                 },
             },
         })
@@ -780,7 +793,7 @@
             if (height < 307) {
                 height = 307;
             }
-            y = maxbot - height - 75;
+            y = maxbot - height - 105;
             x = 30;
         } else {
             const wid = $("#ncPopup").width();
@@ -908,6 +921,7 @@
             'Road Impassable',
             'Truck Closure'
         ];
+        let hideArchivedOnMap = $('#settingsHideArchivedOnMap').is(':checked');
         reports.forEach(function(reportDetails) {
             if (!reportIDs.hasOwnProperty(reportDetails.id)) {
                 reportIDs[reportDetails.id] = reportDetails.id;
@@ -927,11 +941,15 @@
 						report.attributes.roadFullName = report.attributes.road + (report.attributes.commonName && (report.attributes.commonName !== report.attributes.road) ? ' (' + report.attributes.commonName + ')' : '');
 					}
                     report.archived = false;
+                    report.hidden = false;
                     if (_settings.archivedReports.hasOwnProperty(report.id)) {
                         if ( _settings.archivedReports[report.id].lastUpdated != report.attributes.lastUpdate) {
                             delete _settings.archivedReports[report.id];
                         } else {
                             report.archived = true;
+                            if (hideArchivedOnMap) {
+                                report.hidden = true;
+                            }
                         }
                     }
                     addReportToMap(report);
@@ -1083,9 +1101,15 @@
                     }
                 },
                 {
-                    predicate: (properties)=>{ return properties.archived == true; },
+                    predicate: (properties)=>{ return properties.archived == true },
                     style: {
                         graphicOpacity: 0.5,
+                    },
+                },
+                {
+                    predicate: (properties)=>{ return properties.hidden == true; },
+                    style: {
+                        display: 'none',
                     },
                 },
             ],
@@ -1252,6 +1276,7 @@
         });
         $('#ncdotFilterLabel').click(function(e) {
             $('#ncdotFilterLabel .fa-caret-down').toggleClass("fa-flip-vertical");
+            $('#ncDotFilterCollapse').toggle()
         });
         $('#closures-sheet-go').click(function(evt) {evt.stopPropagation(); window.open('https://www.wazenc.us/closures','_blank');});
         $('#tims-id-go').click(onTimsIdGoClick);
@@ -1260,6 +1285,32 @@
                 onTimsIdGoClick();
             };
         });
+        $('#settingsHideArchivedOnMap').change(
+            function(evt){
+                evt.stopPropagation();
+                hideAllReportPopovers();
+                fetchReports(true);
+            }
+        )
+        $('.au:contains("Unarchive all")').click(function() {
+            WazeWrap.Alerts.confirm(SCRIPT_NAME, "Are you sure you want to unarchive all reports?", () => {
+                archiveAllReports(true)
+            },null);
+        })
+        $('.au:contains("Archive all")').click(function() {
+            WazeWrap.Alerts.confirm(SCRIPT_NAME, "Are you sure you want to archive all reports?", () => {
+                archiveAllReports(false)
+            },null);
+        })
+        $('#secureSite').click(function(){
+            saveSettingsToStorage();
+            hideAllReportPopovers();
+            fetchReports(true);
+        })
+        $('#btn-copy-active-ids').click(function() {
+            copyIncidentIDsToClipboard();
+            WazeWrap.Alerts.success(SCRIPT_NAME, 'IDs have been copied to the clipboard.');
+        })
     }
 
     function onModeChanged(model, modeId, context) {
@@ -1299,7 +1350,7 @@
                     $('<label id="ncdotFilterLabel" style="width:100%; cursor:pointer; border-bottom: 1px solid #e0e0e0; margin-top:9px;" data-toggle="collapse" data-target="#ncDotFilterCollapse"><span class="fa fa-caret-down" style="margin-right:5px;font-size:120%;"></span>Filters</label>'),
                     $('<div>',{id:'ncDotFilterCollapse',class:'collapse',style:'font-size:12px;'}
                      ).append(
-                        $('<div>',{class:'controls-container',style:'font-weight:bold;display:block;'}).text('Hide Reports... ')
+                        $('<div>',{class:'controls-container',style:'font-weight:bold;display:block;'}).text('Hide Reports in Table... ')
                     ).append(
                         $('<div>',{class:'controls-container',style:'width:60%; display:inline-block;'})
                         .append(
@@ -1344,19 +1395,11 @@
                         ).append(
                             $('<span>',{class:'nc-dot-table-label nc-dot-report-count count'})
                         ).append(
-                            $('<span>',{class:'nc-dot-table-label nc-dot-table-action right'}).text('Archive all').click(function() {
-                                WazeWrap.Alerts.confirm(SCRIPT_NAME, "Are you sure you want to archive all reports?", () => {
-                                    archiveAllReports(false)
-                                },null);
-                            })
+                            $('<span>',{class:'nc-dot-table-label nc-dot-table-action right au'}).text('Archive all')
                         ).append(
                             $('<span>', {class:'nc-dot-table-label right', style:'padding:0px 2px;'}).text('|')
                         ).append(
-                            $('<span>',{class:'nc-dot-table-label nc-dot-table-action right'}).text('Un-Archive all').click(function() {
-                                WazeWrap.Alerts.confirm(SCRIPT_NAME, "Are you sure you want to un-archive all reports?", () => {
-                                    archiveAllReports(true)
-                                },null);
-                            })
+                            $('<span>',{class:'nc-dot-table-label nc-dot-table-action right au'}).text('Unarchive all')
                         )
                     )
                 ),
@@ -1378,7 +1421,7 @@
                     .append($('<label>', {for:'settingsCopyPL'}).text('Copy Permalink when archiving report')),
                     $('<div>',{class:'controls-container'})
                     .append($('<input>', {type:'checkbox',name:'settingsAutoOpenClosures',id:'settingsAutoOpenClosures'}))
-                    .append($('<label>', {for:'settingsAutoOpenClosures'}).html('Auto open Closures tab on segments<br /><em>(enable/disable using Alt+Shift+C)</em>')),
+                    .append($('<label>', {for:'settingsAutoOpenClosures'}).html('Auto open Closures tab when selecting segment(s)<br /><em style="font-size:10px;">Enable/disable using Alt+Shift+C</em><br /><em style="font-size:10px; color:red;">Currently borked due to WME updates</em>')),
                     $('<div>',{class:'controls-container'})
                     .append($('<input>', {type:'checkbox',name:'settingsHidePoly',id:'settingsHidePoly'}))
                     .append($('<label>', {for:'settingsHidePoly'}).html('Hide DriveNC incident polylines from NCDOT Reports layer')),
@@ -1387,21 +1430,17 @@
                     .append($('<label>', {for:'settingsPositionLeft'}).html('Open pop-ups at bottom left of window instead of centered on marker')),
                     $('<div>',{class:'controls-container'})
                     .append($('<input>', {type:'checkbox',name:'settingsAutoOpenPopup',id:'settingsAutoOpenPopup'}))
-                    .append($('<label>', {for:'settingsAutoOpenPopup'}).html('Open pop-up automatically if map is centered on incident lat/lon (designed for opening PLs)'))
+                    .append($('<label>', {for:'settingsAutoOpenPopup'}).html('Open pop-up automatically if map is centered on report lat/lon<br /><em style="font-size:10px;">Useful when opening PLs from NC Closures Sheet</em>')),
+                    $('<div>',{class:'controls-container'})
+                    .append($('<input>', {type:'checkbox',name:'settingsHideArchivedOnMap',id:'settingsHideArchivedOnMap'}))
+                    .append($('<label>', {for:'settingsHideArchivedOnMap'}).html('Hide Archived reports on map (vs showing at 50% opacity)<br /><em style="font-size:10px;">Changing this setting will refresh reports</em>'))
                 ),
                 $('<div>',{id:'ncdot-tabs-sm',class:'tab-pane'}).append(
                     $('<div>', {id:'sm-active-closures'}).append(
-                        $('<button type="button" class="btn-dot btn-dot-primary" style="">Copy Active IDs to clipboard</button>').click(function() {
-                            copyIncidentIDsToClipboard();
-                            WazeWrap.Alerts.success(SCRIPT_NAME, 'IDs have been copied to the clipboard.');
-                        }),
+                        $('<button type="button" class="btn-dot btn-dot-primary" id="btn-copy-active-ids" style="">Copy Active IDs to clipboard</button>'),
                         $('<div>',{class:'controls-container'})
-                        .append($('<input>', {type:'checkbox',name:'secureSite',id:'secureSite'}).change(function(){
-                            saveSettingsToStorage();
-                            hideAllReportPopovers();
-                            fetchReports(true);
-                        }))
-                        .append($('<label>', {for:'secureSite'}).text('Use TIMS Admin site instead of DriveNC'))
+                        .append($('<input>', {type:'checkbox',name:'secureSite',id:'secureSite'}))
+                        .append($('<label>', {for:'secureSite'}).html('Use TIMS Admin site instead of DriveNC<br /><em style="font-size:10px;">Changing this setting will refresh reports</em>'))
                     )
                 )
             )
@@ -1452,13 +1491,13 @@
                 if (_settings[settingProps[i]]) { $('#' + checkboxIds[i]).attr('checked', 'checked'); }
             }
             $('#settingsHideNCDotXDaysNumber').attr('value', _settings.hideXDaysNumber)
-        })(['showCityCountyCheck','hideLocated','hideJump','copyPL','copyDescription','autoOpenClosures','hidePoly','positionLeft','autoOpenPopup','hideArchivedReports','hideAllButWeatherReports', 'secureSite','hideInterstatesReports','hideUSHighwaysReports','hideNCHighwaysReports','hideSRHighwaysReports','hideXDaysReports','hideXDaysNumber'],
-           ['settingsShowCityCounty','settingsHideLocated','settingsHideJump','settingsCopyPL','settingsCopyDescription','settingsAutoOpenClosures','settingsHidePoly','settingsPositionLeft','settingsAutoOpenPopup','settingsHideNCDotArchivedReports','settingsHideNCDotAllButWeatherReports', 'secureSite','settingsHideNCDotInterstatesReports','settingsHideNCDotUSHighwaysReports','settingsHideNCDotNCHighwaysReports','settingsHideNCDotSRHighwaysReports','settingsHideNCDotXDaysReports','settingsHideNCDotXDaysNumber']);
+        })(['showCityCountyCheck','hideLocated','hideJump','copyPL','copyDescription','autoOpenClosures','hidePoly','positionLeft','autoOpenPopup','hideArchivedOnMap','hideArchivedReports','hideAllButWeatherReports', 'secureSite','hideInterstatesReports','hideUSHighwaysReports','hideNCHighwaysReports','hideSRHighwaysReports','hideXDaysReports','hideXDaysNumber'],
+           ['settingsShowCityCounty','settingsHideLocated','settingsHideJump','settingsCopyPL','settingsCopyDescription','settingsAutoOpenClosures','settingsHidePoly','settingsPositionLeft','settingsAutoOpenPopup','settingsHideArchivedOnMap','settingsHideNCDotArchivedReports','settingsHideNCDotAllButWeatherReports', 'secureSite','settingsHideNCDotInterstatesReports','settingsHideNCDotUSHighwaysReports','settingsHideNCDotNCHighwaysReports','settingsHideNCDotSRHighwaysReports','settingsHideNCDotXDaysReports','settingsHideNCDotXDaysNumber']);
     }
 
     function initGui() {
-        init511ReportsOverlay();
         initUserPanel();
+        init511ReportsOverlay();
         fetchReports(false);
 
         let classHtml = [
@@ -1539,6 +1578,7 @@
                 hidePoly:false,
                 positionLeft:false,
                 autoOpenPopup:false,
+                hideArchivedOnMap:false,
                 hideArchivedReports:true,
                 hideAllButWeatherReports:false,
                 hideInterstatesReports:false,
