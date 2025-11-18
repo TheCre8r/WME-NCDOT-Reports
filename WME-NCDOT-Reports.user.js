@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME NCDOT Reports
 // @namespace    https://greasyfork.org/users/45389
-// @version      2025.07.09.00
+// @version      2025.11.17.00
 // @description  Display NC transportation department reports in WME.
 // @author       MapOMatic, The_Cre8r, and ABelter
 // @license      GNU GPLv3
@@ -37,12 +37,7 @@
     const UPDATE_ALERT = true;
     const SCRIPT_CHANGES = [
         '<ul>',
-        '<li>New Setting: Hide archived reports instead of displaying at 50% opacity</li>',
-        '<li>New Feature: Common Road Name shown in tooltip when hovering over Road column of table</li>',
-        '<li>Fixed: Bug introduced in v2025.07.07 when using the new "open pop-up automatically" setting and opening reports from table</li>',
-        '<li>Fixed: Filters in sidebar not collapsing/li>',
-        '<li>Fixed: Archive/Unarchive All functionality/li>',
-        '<li>Known issues:<ul><li>Icons appear beneath closures</li><li>Auto-open Closures tab when selecting segments broken</li></ul></li>',
+        '<li>Fixed: Incidents without polylines would create errors and would prohibit popup functions.</li>',
         '</ul>'
     ].join('\n');
 
@@ -823,7 +818,7 @@
         if(rpt.id > 9999) {
             let poly_zindex = sdk.Map.getLayerZIndex({ layerName: 'roads' }) -1;
             let hidePoly = $('#settingsHidePoly').is(':checked');
-            if (hidePoly == false) {
+            if (hidePoly == false && (rpt.attributes.polyline != "")) {
                 let poly = JSON.parse(rpt.attributes.polyline);
                 const color = "#FF6F61";
 
